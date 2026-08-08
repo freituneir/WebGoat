@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.TimeZone;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -69,18 +70,35 @@ public class FileServer {
     var username = authentication.getName();
     var destinationDir = new File(fileLocation, username);
     destinationDir.mkdirs();
+    var fileName = sanitizedFileName(multipartFile.getOriginalFilename());
     // DO NOT use multipartFile.transferTo(), see
     // https://stackoverflow.com/questions/60336929/java-nio-file-nosuchfileexception-when-file-transferto-is-called
     try (InputStream is = multipartFile.getInputStream()) {
-      var destinationFile = destinationDir.toPath().resolve(multipartFile.getOriginalFilename());
+      var uploadRoot = destinationDir.toPath().toAbsolutePath().normalize();
+      var destinationFile = uploadRoot.resolve(fileName).normalize();
+      if (!destinationFile.startsWith(uploadRoot)) {
+        throw new IOException("Invalid file name: " + multipartFile.getOriginalFilename());
+      }
       Files.deleteIfExists(destinationFile);
       Files.copy(is, destinationFile);
     }
-    log.debug("File saved to {}", new File(destinationDir, multipartFile.getOriginalFilename()));
+    log.debug("File saved to {}", new File(destinationDir, fileName));
 
     return new ModelAndView(
         new RedirectView("files", true),
         new ModelMap().addAttribute("uploadSuccess", "File uploaded successful"));
+  }
+
+  /**
+   * Reduces a client-supplied multipart filename to its last path segment, so any directory
+   * component it carried cannot influence where the upload is written.
+   */
+  private static String sanitizedFileName(String originalFilename) throws IOException {
+    var name = FilenameUtils.getName(originalFilename == null ? "" : originalFilename);
+    if (name.isBlank() || ".".equals(name) || "..".equals(name)) {
+      throw new IOException("Invalid file name: " + originalFilename);
+    }
+    return name;
   }
 
   @GetMapping(value = "/files")
