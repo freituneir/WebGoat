@@ -48,7 +48,13 @@ public class ProfileUploadBase implements AssignmentEndpoint {
     File uploadDirectory = cleanupAndCreateDirectoryForUser(username);
 
     try {
-      var uploadedFile = new File(uploadDirectory, fullName);
+      var uploadRoot = uploadDirectory.getCanonicalFile();
+      var uploadedFile = new File(uploadRoot, fullName);
+      // The resolved destination must stay beneath the user's own upload directory, so a
+      // name containing ../ cannot escape it.
+      if (!uploadedFile.getCanonicalPath().startsWith(uploadRoot.getPath() + File.separator)) {
+        return failed(this).feedback("path-traversal-profile-empty-name").build();
+      }
       uploadedFile.createNewFile();
       FileCopyUtils.copy(file.getBytes(), uploadedFile);
 

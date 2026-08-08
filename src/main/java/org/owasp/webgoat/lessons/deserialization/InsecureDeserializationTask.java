@@ -40,7 +40,19 @@ public class InsecureDeserializationTask implements AssignmentEndpoint {
     b64token = token.replace('-', '+').replace('_', '/');
 
     try (ObjectInputStream ois =
-        new ObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(b64token)))) {
+        new ObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(b64token))) {
+          @Override
+          protected Class<?> resolveClass(java.io.ObjectStreamClass desc)
+              throws java.io.IOException, ClassNotFoundException {
+            // Type is decided before the object is constructed: a gadget class is refused
+            // here rather than after its side effects have already run.
+            if (!VulnerableTaskHolder.class.getName().equals(desc.getName())) {
+              throw new java.io.InvalidClassException(
+                  "Refused to deserialize unexpected class", desc.getName());
+            }
+            return super.resolveClass(desc);
+          }
+        }) {
       before = System.currentTimeMillis();
       Object o = ois.readObject();
       if (!(o instanceof VulnerableTaskHolder)) {
