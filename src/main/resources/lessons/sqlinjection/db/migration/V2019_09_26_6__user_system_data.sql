@@ -5,8 +5,8 @@ CREATE TABLE user_system_data(
   cookie varchar(30)
 );
 
-INSERT INTO user_system_data VALUES (101,'jsnow','passwd1', '');
-INSERT INTO user_system_data VALUES (102,'jdoe','passwd2', '');
-INSERT INTO user_system_data VALUES (103,'jplane','passwd3', '');
-INSERT INTO user_system_data VALUES (104,'jeff','jeff', '');
-INSERT INTO user_system_data VALUES (105,'dave','passW0rD', '');
+INSERT INTO user_system_data VALUES (101, 'jsnow', SUBSTRING(CAST(UUID() AS VARCHAR(36)) FROM 1 FOR 10), '');
+INSERT INTO user_system_data VALUES (102, 'jdoe', SUBSTRING(CAST(UUID() AS VARCHAR(36)) FROM 1 FOR 10), '');
+INSERT INTO user_system_data VALUES (103, 'jplane', SUBSTRING(CAST(UUID() AS VARCHAR(36)) FROM 1 FOR 10), '');
+INSERT INTO user_system_data VALUES (104, 'jeff', SUBSTRING(CAST(UUID() AS VARCHAR(36)) FROM 1 FOR 10), '');
+INSERT INTO user_system_data VALUES (105, 'dave', SUBSTRING(CAST(UUID() AS VARCHAR(36)) FROM 1 FOR 10), '');
