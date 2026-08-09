@@ -6,9 +6,7 @@ package org.owasp.webgoat.lessons.webwolfintroduction;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -29,7 +27,6 @@ public class MailAssignment implements AssignmentEndpoint {
 
   private final String webWolfURL;
   private RestTemplate restTemplate;
-
   public MailAssignment(
       RestTemplate restTemplate, @Value("${webwolf.mail.url}") String webWolfURL) {
     this.restTemplate = restTemplate;
@@ -47,8 +44,9 @@ public class MailAssignment implements AssignmentEndpoint {
               .recipient(username)
               .title("Test messages from WebWolf")
               .contents(
-                  "This is a test message from WebWolf, your unique code is: "
-                      + StringUtils.reverse(username))
+                  "This is a test message from WebWolf. It deliberately carries no code: mail is"
+                      + " not a confidential channel, and anything written into a message is"
+                      + " readable by every host that relays or stores it.")
               .sender("webgoat@owasp.org")
               .build();
       try {
@@ -71,10 +69,8 @@ public class MailAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/mail")
   @ResponseBody
   public AttackResult completed(@RequestParam String uniqueCode, @CurrentUsername String username) {
-    if (uniqueCode.equals(StringUtils.reverse(username))) {
-      return success(this).build();
-    } else {
-      return failed(this).feedbackArgs("webwolf.code_incorrect").feedbackArgs(uniqueCode).build();
-    }
+    // Nothing is mailed that can be handed back, so presenting a code proves nothing about who is
+    // asking - the same reason the password reset lessons stopped mailing their tokens.
+    return failed(this).feedbackArgs("webwolf.code_incorrect").feedbackArgs(uniqueCode).build();
   }
 }

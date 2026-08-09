@@ -6,6 +6,7 @@ package org.owasp.webgoat.webwolf.mailbox;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * @author nbaars
@@ -14,4 +15,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MailboxRepository extends JpaRepository<Email, String> {
 
   List<Email> findByRecipientOrderByTimeDesc(String recipient);
+
+  @Transactional
+  void deleteByRecipient(String recipient);
 }
