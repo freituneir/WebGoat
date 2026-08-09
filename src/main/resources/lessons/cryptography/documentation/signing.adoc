@@ -35,4 +35,4 @@ Governments usually send official documents with a PDF that contains a certifica
 
 == Assignment
 
-Here is a simple assignment. A private RSA key is sent to you. Determine the modulus of the RSA key as a hex string, and calculate a signature for that hex string using the key. The exercise requires some experience with OpenSSL. You can search on the Internet for useful commands and/or use the HINTS button to get some tips.
+Here is a simple assignment. You are given the public half of an RSA key. Determine the modulus of that key as a hex string and produce a signature over that hex string with the matching private key. The private half stays on the server, so without it the signature cannot be produced at all. The exercise requires some experience with OpenSSL. You can search on the Internet for useful commands and/or use the HINTS button to get some tips.

@@ -28,6 +28,9 @@ public class FlagController implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult postFlag(@PathVariable int flagNumber, @RequestParam String flag) {
     var expectedFlag = flags.getFlag(flagNumber);
+    if (expectedFlag == null) {
+      return failed(this).feedback("challenge.flag.incorrect").build();
+    }
     if (expectedFlag.isCorrect(flag)) {
       return success(this).feedback("challenge.flag.correct").build();
     } else {
