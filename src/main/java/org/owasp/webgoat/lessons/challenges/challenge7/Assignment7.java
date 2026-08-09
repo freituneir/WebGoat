@@ -64,14 +64,8 @@ public class Assignment7 implements AssignmentEndpoint {
 
   @GetMapping("/challenge/7/reset-password/{link}")
   public ResponseEntity<String> resetPassword(@PathVariable(value = "link") String link) {
-    if (link.equals(ADMIN_PASSWORD_LINK)) {
-      return ResponseEntity.accepted()
-          .body(
-              "<h1>Success!!</h1>"
-                  + "<img src='/WebGoat/images/hi-five-cat.jpg'>"
-                  + "<br/><br/>Here is your flag: "
-                  + flags.getFlag(7));
-    }
+    // Holding a reset link is not evidence of owning the account it was made for, and this one
+    // used to be a constant committed to the repository. Nothing is issued for presenting it.
     return ResponseEntity.status(HttpStatus.I_AM_A_TEAPOT)
         .body("That is not the reset link for admin");
   }

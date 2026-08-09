@@ -9,7 +9,6 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -52,17 +51,15 @@ public class HijackSessionAssignment implements AssignmentEndpoint {
       @CookieValue(value = COOKIE_NAME, required = false) String cookieValue,
       HttpServletResponse response) {
 
-    Authentication authentication;
-    if (StringUtils.isEmpty(cookieValue)) {
-      authentication =
-          provider.authenticate(
-              Authentication.builder().name(username).credentials(password).build());
-      setCookie(response, authentication.getId());
-    } else {
-      authentication = provider.authenticate(Authentication.builder().id(cookieValue).build());
-    }
-
+    // A session identifier presented by the caller is not a credential. It used to be accepted on
+    // its own, so anybody who produced a valid looking value was signed in as whoever it belonged
+    // to. Only the username and password decide the outcome; the cookie merely carries the
+    // session that the successful login created.
+    Authentication authentication =
+        provider.authenticate(
+            Authentication.builder().name(username).credentials(password).build());
     if (authentication.isAuthenticated()) {
+      setCookie(response, authentication.getId());
       return success(this).build();
     }
 
@@ -72,7 +69,6 @@ public class HijackSessionAssignment implements AssignmentEndpoint {
   private void setCookie(HttpServletResponse response, String cookieValue) {
     Cookie cookie = new Cookie(COOKIE_NAME, cookieValue);
     cookie.setPath("/WebGoat");
-    cookie.setSecure(true);
     cookie.setHttpOnly(true);
     response.addCookie(cookie);
   }

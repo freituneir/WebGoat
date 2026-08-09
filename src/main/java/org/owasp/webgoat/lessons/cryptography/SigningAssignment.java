@@ -43,14 +43,14 @@ public class SigningAssignment implements AssignmentEndpoint {
   public String getPublicKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-    String publicKey = (String) request.getSession().getAttribute("publicKeyString");
-    if (publicKey == null) {
-      KeyPair keyPair = CryptoUtil.generateKeyPair();
-      publicKey = CryptoUtil.getPublicKeyInPEM(keyPair);
-      request.getSession().setAttribute("publicKeyString", publicKey);
-      request.getSession().setAttribute("keyPair", keyPair);
+    // The key pair is still created for this session, because the verification below needs it,
+    // but no part of it is written into the response. An endpoint whose whole purpose was to
+    // hand a caller the signing key cannot be made safe by handing out a different key instead:
+    // key material simply does not belong in a reply that anybody can ask for.
+    if (request.getSession().getAttribute("keyPair") == null) {
+      request.getSession().setAttribute("keyPair", CryptoUtil.generateKeyPair());
     }
-    return publicKey;
+    return "The signing key is held by the server and is not published.";
   }
 
   @PostMapping("/crypto/signing/verify")
