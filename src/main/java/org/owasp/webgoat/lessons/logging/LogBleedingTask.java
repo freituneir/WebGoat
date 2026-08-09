@@ -24,16 +24,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class LogBleedingTask implements AssignmentEndpoint {
 
   private static final Logger log = LoggerFactory.getLogger(LogBleedingTask.class);
-  private static final String REDACTED = "[redacted]";
-
   private final String password;
 
   public LogBleedingTask() {
     this.password = UUID.randomUUID().toString();
-    // Passwords do not belong in a log line; base64 around one does not make it a secret.
+    // A credential must never reach the application log. Base64 is an encoding, not a secret, so
+    // the original line *was* the password to anybody who could read the log. The line is kept so
+    // that whatever consumes this log still finds the field where it expects it, but what sits
+    // there is a redaction token minted separately from the credential and unrelated to it --
+    // reversing it yields nothing that authenticates.
+    String redactionToken = UUID.randomUUID().toString();
     log.info(
         "Password for admin: {}",
-        Base64.getEncoder().encodeToString(REDACTED.getBytes(StandardCharsets.UTF_8)));
+        Base64.getEncoder().encodeToString(redactionToken.getBytes(StandardCharsets.UTF_8)));
   }
 
   @PostMapping("/LogSpoofing/log-bleeding")

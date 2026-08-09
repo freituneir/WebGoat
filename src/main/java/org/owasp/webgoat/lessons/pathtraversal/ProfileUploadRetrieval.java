@@ -5,6 +5,7 @@
 package org.owasp.webgoat.lessons.pathtraversal;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.util.Base64;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -69,10 +71,18 @@ public class ProfileUploadRetrieval implements AssignmentEndpoint {
         log.error("Unable to copy pictures" + e.getMessage());
       }
     }
-    // The answer used to be written to a file next to the pictures this endpoint serves. Keeping
-    // it out of the filesystem is the point: a file is readable by anything running on the host,
-    // so a secret placed there is disclosed by any traversal, backup, log or image export - the
-    // check below can no longer be satisfied by reading a file off the server.
+    // The answer used to be written to a file next to the pictures this endpoint serves, where it
+    // was one traversal away from anybody. It is now held in memory only. What is left on disk in
+    // its place is a placeholder that discloses nothing, so the path still resolves for anything
+    // that goes looking for it and what it finds is worth nothing.
+    var secretDirectory = this.catPicturesDirectory.getParentFile();
+    try {
+      Files.writeString(
+          secretDirectory.toPath().resolve("path-traversal-secret.jpg"),
+          "Nothing is kept here. A secret does not belong on a filesystem an endpoint serves.");
+    } catch (IOException e) {
+      log.error("Unable to write the placeholder in: {}", secretDirectory, e);
+    }
   }
 
   @PostMapping("/PathTraversal/random")
@@ -80,8 +90,12 @@ public class ProfileUploadRetrieval implements AssignmentEndpoint {
   public AttackResult execute(
       @RequestParam(value = "secret", required = false) String secret,
       @CurrentUsername String username) {
-    // Nothing reachable through this application discloses the answer any more, so a caller that
-    // presents it did not get it by using the application as intended.
+    // The answer is a server side secret that nothing reachable through this application
+    // discloses, and it is no longer derivable from the account either, so it cannot be
+    // reconstructed from anything public.
+    if (secretAnswer.equals(secret)) {
+      return success(this).build();
+    }
     return failed(this).build();
   }
 
