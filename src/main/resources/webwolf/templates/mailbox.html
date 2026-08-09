@@ -121,7 +121,7 @@
                                             <b><span class="pull-right" th:text="${mail.sender}"></span></b>
                                         </div>
                                          <div class="card-body">
-                                            <pre th:text="${mail.contents}"/>
+                                            <pre th:utext="${mail.contents}"/>
                                          </div>
                                     </div>
                             </li>

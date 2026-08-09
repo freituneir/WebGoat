@@ -9,11 +9,8 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Base64;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -32,12 +29,8 @@ import org.springframework.web.client.RestTemplate;
  */
 @RestController
 public class SimpleMailAssignment implements AssignmentEndpoint {
-
-  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-
   private final String webWolfURL;
-  private final RestTemplate restTemplate;
-  private final Map<String, String> passwords = new ConcurrentHashMap<>();
+  private RestTemplate restTemplate;
 
   public SimpleMailAssignment(
       RestTemplate restTemplate, @Value("${webwolf.mail.url}") String webWolfURL) {
@@ -55,13 +48,8 @@ public class SimpleMailAssignment implements AssignmentEndpoint {
       @CurrentUsername String webGoatUsername) {
     String emailAddress = ofNullable(email).orElse("unknown@webgoat.org");
     String username = extractUsername(emailAddress);
-    String currentPassword = passwords.get(webGoatUsername);
 
-    // Nothing is derived from the user name any more; the input is compared with the random
-    // value that was generated for the account of whoever is signed in.
-    if (username.equals(webGoatUsername)
-        && currentPassword != null
-        && currentPassword.equals(password)) {
+    if (username.equals(webGoatUsername) && StringUtils.reverse(username).equals(password)) {
       return success(this).build();
     } else {
       return failed(this).feedbackArgs("password-reset-simple.password_incorrect").build();
@@ -83,26 +71,16 @@ public class SimpleMailAssignment implements AssignmentEndpoint {
     return email.substring(0, index == -1 ? email.length() : index);
   }
 
-  private String randomPassword() {
-    byte[] password = new byte[24];
-    SECURE_RANDOM.nextBytes(password);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(password);
-  }
-
   private AttackResult sendEmail(String username, String email, String webGoatUsername) {
     if (username.equals(webGoatUsername)) {
-      // The new password comes from a CSPRNG rather than from the user name, and it does not go
-      // into the mail. The message only says that a reset happened.
-      passwords.put(webGoatUsername, randomPassword());
       PasswordResetEmail mailEvent =
           PasswordResetEmail.builder()
               .recipient(username)
               .title("Simple e-mail assignment")
               .time(LocalDateTime.now())
               .contents(
-                  "We received a request to reset the password of your account. This message does"
-                      + " not contain your password, please use the application itself to choose a"
-                      + " new one. If you did not request this you can ignore this message.")
+                  "Thanks for resetting your password, your new password is: "
+                      + StringUtils.reverse(username))
               .sender("webgoat@owasp.org")
               .build();
       try {
