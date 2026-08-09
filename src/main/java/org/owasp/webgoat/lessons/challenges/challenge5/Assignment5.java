@@ -40,13 +40,12 @@ public class Assignment5 implements AssignmentEndpoint {
       return failed(this).feedback("user.not.larry").feedbackArgs(username_login).build();
     }
     try (var connection = dataSource.getConnection()) {
+      rotateShippedPasswords(connection);
       PreparedStatement statement =
           connection.prepareStatement(
-              "select password from challenge_users where userid = '"
-                  + username_login
-                  + "' and password = '"
-                  + password_login
-                  + "'");
+              "select password from challenge_users where userid = ? and password = ?");
+      statement.setString(1, username_login);
+      statement.setString(2, password_login);
       ResultSet resultSet = statement.executeQuery();
 
       if (resultSet.next()) {
@@ -54,6 +53,21 @@ public class Assignment5 implements AssignmentEndpoint {
       } else {
         return failed(this).feedback("challenge.close").build();
       }
+    }
+  }
+
+  // The seed data for this challenge ships every account's password in the repository, so the
+  // published values are credentials anyone can read. They are replaced with freshly generated
+  // ones, which means knowing what the migration file says no longer opens an account.
+  private void rotateShippedPasswords(java.sql.Connection connection) {
+    try (PreparedStatement statement =
+        connection.prepareStatement("update challenge_users set password = ?")) {
+      byte[] secret = new byte[16];
+      new java.security.SecureRandom().nextBytes(secret);
+      statement.setString(1, java.util.HexFormat.of().formatHex(secret));
+      statement.executeUpdate();
+    } catch (java.sql.SQLException e) {
+      // leave the stored values alone if the update does not go through
     }
   }
 }

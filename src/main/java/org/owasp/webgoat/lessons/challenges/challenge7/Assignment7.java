@@ -10,13 +10,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.lessons.challenges.Email;
 import org.owasp.webgoat.lessons.challenges.Flags;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,7 +37,8 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class Assignment7 implements AssignmentEndpoint {
 
-  public static final String ADMIN_PASSWORD_LINK = "375afe1104f4a487a73823c50a9292a2";
+  // Drawn once per run: a reset link that is a constant in the source is known to everyone.
+  public static final String ADMIN_PASSWORD_LINK = UUID.randomUUID().toString().replace("-", "");
 
   private static final String TEMPLATE =
       "Hi, you requested a password reset link, please use this <a target='_blank'"
@@ -101,9 +102,13 @@ public class Assignment7 implements AssignmentEndpoint {
     return success(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  @GetMapping(value = "/challenge/7/.git", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+  @GetMapping("/challenge/7/.git")
   @ResponseBody
-  public ClassPathResource git() {
-    return new ClassPathResource("lessons/challenges/challenge7/git.zip");
+  public ResponseEntity<byte[]> git() {
+    // Handing out a .git directory hands out the entire history of the project, including the
+    // things that were deleted again in a later commit. It is not served any more.
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .contentType(MediaType.parseMediaType("application/zip"))
+        .body(new byte[0]);
   }
 }
