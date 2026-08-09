@@ -4,11 +4,8 @@
  */
 package org.owasp.webgoat.lessons.challenges.challenge7;
 
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 
-import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +39,7 @@ public class Assignment7 implements AssignmentEndpoint {
 
   private static final String TEMPLATE =
       "Hi, you requested a password reset link, please use this <a target='_blank'"
-          + " href='%s:8080/WebGoat/challenge/7/reset-password/%s'>link</a> to reset your"
+          + " href='%s/WebGoat/challenge/7/reset-password/%s'>link</a> to reset your"
           + " password.\n"
           + " \n\n"
           + "If you did not request this password change you can ignore this message.\n"
@@ -54,12 +51,17 @@ public class Assignment7 implements AssignmentEndpoint {
   private final Flags flags;
   private final RestTemplate restTemplate;
   private final String webWolfMailURL;
+  private final String webGoatBaseUrl;
 
   public Assignment7(
-      Flags flags, RestTemplate restTemplate, @Value("${webwolf.mail.url}") String webWolfMailURL) {
+      Flags flags,
+      RestTemplate restTemplate,
+      @Value("${webwolf.mail.url}") String webWolfMailURL,
+      @Value("http://${webgoat.host}:${webgoat.port}") String webGoatBaseUrl) {
     this.flags = flags;
     this.restTemplate = restTemplate;
     this.webWolfMailURL = webWolfMailURL;
+    this.webGoatBaseUrl = webGoatBaseUrl;
   }
 
   @GetMapping("/challenge/7/reset-password/{link}")
@@ -78,19 +80,20 @@ public class Assignment7 implements AssignmentEndpoint {
 
   @PostMapping("/challenge/7")
   @ResponseBody
-  public AttackResult sendPasswordResetLink(@RequestParam String email, HttpServletRequest request)
-      throws URISyntaxException {
+  public AttackResult sendPasswordResetLink(@RequestParam String email) {
     if (StringUtils.hasText(email)) {
       String username = email.substring(0, email.indexOf("@"));
       if (StringUtils.hasText(username)) {
-        URI uri = new URI(request.getRequestURL().toString());
+        // The absolute URL comes from this server's own configuration. Building it out of the
+        // request - getRequestURL() is assembled from the Host header - let a caller point the
+        // link they mailed to somebody else at a host they control.
         Email mail =
             Email.builder()
                 .title("Your password reset link for challenge 7")
                 .contents(
                     String.format(
                         TEMPLATE,
-                        uri.getScheme() + "://" + uri.getHost(),
+                        webGoatBaseUrl,
                         new PasswordResetLink().createPasswordReset(username, "webgoat")))
                 .sender("password-reset@webgoat-cloud.net")
                 .recipient(username)
@@ -99,7 +102,10 @@ public class Assignment7 implements AssignmentEndpoint {
         restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
       }
     }
-    return success(this).feedback("email.send").feedbackArgs(email).build();
+    // Sending a mail is not solving the challenge. This reported the assignment complete for any
+    // caller who posted an address, so the flag was never what was being measured; the flag is
+    // handed out by resetPassword, and only for the admin link.
+    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
   }
 
   @GetMapping("/challenge/7/.git")
