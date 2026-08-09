@@ -7,6 +7,7 @@
         <link rel="stylesheet" type="text/css" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}"/>
         <link rel="stylesheet" th:href="@{/css/webwolf.css}"/>
         <script th:src="@{/webjars/jquery/jquery.min.js}"></script>
+        <script th:src="@{/js/csrf.js}"></script>
         <script th:src="@{/webjars/bootstrap/js/bootstrap.min.js}"></script>
     </div>
 </head>
@@ -28,9 +29,12 @@
                         <span class="glyphicon glyphicon-user"></span>
                             <span th:text="${#authentication.name}"></span></span></a>
             </li>
-            <li class="nav-item"><a class="nav-link" th:href="@{/logout}">
-                        <span sec:authorize="isAuthenticated()">
-                        Sign out</span></a>
+            <li class="nav-item">
+                <form th:action="@{/logout}" method="post">
+                    <button class="nav-link btn btn-link" type="submit">
+                        <span sec:authorize="isAuthenticated()">Sign out</span>
+                    </button>
+                </form>
             </li>
         </ul>
 </div>

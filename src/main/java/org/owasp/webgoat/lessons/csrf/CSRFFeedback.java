@@ -9,11 +9,10 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -43,6 +42,17 @@ public class CSRFFeedback implements AssignmentEndpoint {
       produces = {"application/json"})
   @ResponseBody
   public AttackResult completed(HttpServletRequest request, @RequestBody String feedback) {
+    // A form on another site can only post one of the three simple content types. Feedback is
+    // JSON, so anything else is turned away before the body is even parsed.
+    String contentType = request.getContentType();
+    if (contentType == null
+        || !contentType.toLowerCase(Locale.ROOT).contains(MediaType.APPLICATION_JSON_VALUE)) {
+      return failed(this).feedback("csrf-feedback-invalid-content-type").build();
+    }
+    // And the request has to prove it started in WebGoat itself.
+    if (!OriginCheck.fromThisApplication(request)) {
+      return failed(this).feedback("csrf-request-rejected").build();
+    }
     try {
       objectMapper.enable(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES);
       objectMapper.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
@@ -54,56 +64,17 @@ public class CSRFFeedback implements AssignmentEndpoint {
     } catch (IOException e) {
       return failed(this).feedback(ExceptionUtils.getStackTrace(e)).build();
     }
-    boolean correctCSRF =
-        requestContainsWebGoatCookie(request.getCookies())
-            && request.getContentType().contains(MediaType.TEXT_PLAIN_VALUE);
-    correctCSRF &= hostOrRefererDifferentHost(request);
-    if (correctCSRF) {
-      String flag = UUID.randomUUID().toString();
-      userSessionData.setValue("csrf-feedback", flag);
-      return success(this).feedback("csrf-feedback-success").feedbackArgs(flag).build();
-    }
     return failed(this).build();
   }
 
   @PostMapping(path = "/csrf/feedback", produces = "application/json")
   @ResponseBody
   public AttackResult flag(@RequestParam("confirmFlagVal") String flag) {
-    if (flag.equals(userSessionData.getValue("csrf-feedback"))) {
+    Object expectedFlag = userSessionData.getValue("csrf-feedback");
+    if (expectedFlag != null && flag.equals(expectedFlag)) {
       return success(this).build();
     } else {
       return failed(this).build();
     }
   }
-
-  private boolean hostOrRefererDifferentHost(HttpServletRequest request) {
-    String referer = request.getHeader("Referer");
-    String host = request.getHeader("Host");
-    if (referer != null) {
-      return !referer.contains(host);
-    } else {
-      return true;
-    }
-  }
-
-  private boolean requestContainsWebGoatCookie(Cookie[] cookies) {
-    if (cookies != null) {
-      for (Cookie c : cookies) {
-        if (c.getName().equals("JSESSIONID")) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /*
-   * Solution:
-   * <form name="attack" enctype="text/plain" action="http://localhost:8080/WebGoat/csrf/feedback/message" METHOD="POST">
-   *    <!-- Construct valid JSON data: {name: "HackHuang", email: "email@example.com", subject: "suggestions", message: "Fixed the invalid solution="} -->
-   *    <input type="hidden" name='{"name": "HackHuang", "email": "email@example.com", "subject": "suggestions","message":"Fixed the invalid solution', value='"}'>
-   * </form>
-   * <script>document.attack.submit();</script>
-   */
-
 }

@@ -29,6 +29,15 @@ $(document).ready(function () {
         '</li>';
 
     getChallenges();
+    loadReviewToken();
+
+    // the review form posts the token that belongs to this session, it is no longer a fixed
+    // value baked into the page which anybody could copy into a form of their own
+    function loadReviewToken() {
+        $.get('csrf/review/token', function (response) {
+            $('#csrfReviewToken').val(response.token);
+        });
+    }
 
     function getChallenges() {
         $("#list").empty();
