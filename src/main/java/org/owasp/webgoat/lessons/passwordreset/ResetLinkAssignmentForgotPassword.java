@@ -60,7 +60,9 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     if (ResetLinkAssignment.TOM_EMAIL.equals(email)
         && (host.contains(webWolfPort)
             && host.contains(webWolfHost))) { // User indeed changed the host header.
-      ResetLinkAssignment.userToTomResetLink.put(username, resetLink);
+      // The link is not recorded against the account that asked for it. Rewriting the Host
+      // header still makes this server fetch the URL, but holding that URL no longer carries
+      // any authority to change the password of the account it was issued for.
       fakeClickingLinkEmail(webWolfURL, resetLink);
     } else {
       try {
