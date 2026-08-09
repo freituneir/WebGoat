@@ -4,6 +4,7 @@
  */
 package org.owasp.webgoat.lessons.challenges.challenge7;
 
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -99,7 +100,11 @@ public class Assignment7 implements AssignmentEndpoint {
         restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
       }
     }
-    return success(this).feedback("email.send").feedbackArgs(email).build();
+    // Sending the mail is not the attack. The assignment is solved by finding the reset link and
+    // using it against the admin account, which GET /challenge/7/reset-password/{link} verifies.
+    // Reporting completion here certified an attack this endpoint never checked, so any POST with
+    // any address solved it.
+    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
   }
 
   @GetMapping("/challenge/7/.git")
