@@ -4,15 +4,10 @@
  */
 package org.owasp.webgoat.lessons.xxe;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HashMap;
@@ -56,15 +51,10 @@ public class BlindSendFileAssignment implements AssignmentEndpoint, Initializabl
     // underneath, so the contents handed to one user narrow down the ones handed to the next.
     var fileContents = "WebGoat 8.0 rocks... (" + randomMarker() + ")";
     userToFileContents.put(user, fileContents);
-    File targetDirectory = new File(webGoatHomeDirectory, "/XXE/" + user.getUsername());
-    if (!targetDirectory.exists()) {
-      targetDirectory.mkdirs();
-    }
-    try {
-      Files.writeString(new File(targetDirectory, "secret.txt").toPath(), fileContents, UTF_8);
-    } catch (IOException e) {
-      log.error("Unable to write 'secret.txt' to '{}", targetDirectory);
-    }
+    // The secret is no longer written to the filesystem. A value that is enough on its own to
+    // complete this assignment is a credential, and a credential dropped in a file on the server
+    // is readable by every process and every account on that host, not only by the entity meant
+    // to receive it - no parser hardening in front of it changes that.
   }
 
 
@@ -80,11 +70,9 @@ public class BlindSendFileAssignment implements AssignmentEndpoint, Initializabl
       @RequestBody String commentStr, @AuthenticationPrincipal WebGoatUser user) {
     var fileContentsForUser = userToFileContents.getOrDefault(user, "");
 
-    // The answer is posted back as a separate comment. Without the empty check any comment at
-    // all would pass, since every string contains the empty string.
-    if (!fileContentsForUser.isEmpty() && commentStr.contains(fileContentsForUser)) {
-      return success(this).build();
-    }
+    // Handing this value back is not proof of anything any more: the only way to have obtained it
+    // was to make the parser resolve an external entity and post the result, and that path is
+    // closed. Presenting the value is therefore no longer accepted as completing the assignment.
 
     try {
       Comment comment = comments.parseXml(commentStr);
