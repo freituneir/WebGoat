@@ -73,15 +73,19 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   @PostMapping("/PasswordReset/reset/login")
   @ResponseBody
   public AttackResult login(@RequestParam String password, @RequestParam String email) {
-    // A password only exists here once the owner of that mailbox redeemed the link that was
-    // delivered to it. Holding a link issued for somebody else never gets an entry in this map,
-    // so this answers the ordinary "wrong password" way rather than by refusing to play.
+    // What this assignment reports is one thing only: somebody else's account was taken over.
+    // Signing in to an account whose password you reset yourself, through the mailbox you own,
+    // is the flow working as intended and demonstrates nothing, so only Tom's account counts.
+    if (!TOM_EMAIL.equals(email)) {
+      return failed(this).feedback("login_failed.tom").build();
+    }
+    // and Tom's link is delivered to Tom's mailbox and redeemable only by Tom, so there is no
+    // route to an entry here for anybody else - this fails the ordinary "wrong password" way
     String currentPassword = passwordsByEmail.getOrDefault(email, PASSWORD_TOM_9);
     if (!PASSWORD_TOM_9.equals(currentPassword) && currentPassword.equals(password)) {
       return success(this).build();
     }
-    return failed(this).feedback(TOM_EMAIL.equals(email) ? "login_failed" : "login_failed.tom")
-        .build();
+    return failed(this).feedback("login_failed").build();
   }
 
   @GetMapping("/PasswordReset/reset/reset-password/{link}")
