@@ -7,8 +7,14 @@ package org.owasp.webgoat.lessons.challenges.challenge5;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import java.security.SecureRandom;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.webgoat.container.LessonDataSource;
@@ -25,6 +31,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RequiredArgsConstructor
 public class Assignment5 implements AssignmentEndpoint {
+
+  // Every account seeded by V2018_09_26_1__users.sql, each of which ships a plaintext password.
+  private static final List<String> SEEDED_USERS = List.of("larry", "tom", "alice", "eve");
+  private static final SecureRandom RANDOM = new SecureRandom();
+
+  private final AtomicBoolean credentialsRotated = new AtomicBoolean(false);
 
   private final LessonDataSource dataSource;
   private final Flags flags;
@@ -57,17 +69,33 @@ public class Assignment5 implements AssignmentEndpoint {
   }
 
   // The seed data for this challenge ships every account's password in the repository, so the
-  // published values are credentials anyone can read. They are replaced with freshly generated
-  // ones, which means knowing what the migration file says no longer opens an account.
-  private void rotateShippedPasswords(java.sql.Connection connection) {
-    try (PreparedStatement statement =
-        connection.prepareStatement("update challenge_users set password = ?")) {
-      byte[] secret = new byte[16];
-      new java.security.SecureRandom().nextBytes(secret);
-      statement.setString(1, java.util.HexFormat.of().formatHex(secret));
-      statement.executeUpdate();
-    } catch (java.sql.SQLException e) {
-      // leave the stored values alone if the update does not go through
+  // published values are credentials anyone can read. Each account is given its own freshly
+  // generated one, which means knowing what the migration file says no longer opens an account.
+  //
+  // The rotation runs once per boot. Re-running it per request would rewrite the row between the
+  // caller reading a password and presenting it, so no credential could ever match -- and it would
+  // write to the table on every unauthenticated request.
+  private void rotateShippedPasswords(Connection connection) {
+    if (!credentialsRotated.compareAndSet(false, true)) {
+      return;
     }
+    try (PreparedStatement statement =
+        connection.prepareStatement("update challenge_users set password = ? where userid = ?")) {
+      for (String userid : SEEDED_USERS) {
+        statement.setString(1, randomPassword());
+        statement.setString(2, userid);
+        statement.addBatch();
+      }
+      statement.executeBatch();
+    } catch (SQLException e) {
+      // leave the stored values alone, and let the next attempt try again
+      credentialsRotated.set(false);
+    }
+  }
+
+  private static String randomPassword() {
+    byte[] secret = new byte[16];
+    RANDOM.nextBytes(secret);
+    return HexFormat.of().formatHex(secret);
   }
 }
