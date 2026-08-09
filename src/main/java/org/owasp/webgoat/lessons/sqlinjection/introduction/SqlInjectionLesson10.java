@@ -8,7 +8,6 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -47,16 +46,14 @@ public class SqlInjectionLesson10 implements AssignmentEndpoint {
 
   protected AttackResult injectableQueryAvailability(String action) {
     StringBuilder output = new StringBuilder();
-    // The search term is bound; the wildcards belong to the value, not to the statement.
-    String query = "SELECT * FROM access_log WHERE action LIKE ?";
+    String query = "SELECT * FROM access_log WHERE action LIKE '%" + action + "%'";
 
     try (Connection connection = dataSource.getConnection()) {
       try {
-        PreparedStatement statement =
-            connection.prepareStatement(
-                query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        statement.setString(1, "%" + action + "%");
-        ResultSet results = statement.executeQuery();
+        Statement statement =
+            connection.createStatement(
+                ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        ResultSet results = statement.executeQuery(query);
 
         if (results.getStatement() != null) {
           results.first();
