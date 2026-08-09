@@ -53,14 +53,8 @@ public class WebSecurityConfig {
               auth.requestMatchers(HttpMethod.POST, "/files", "/mail", "/requests").permitAll();
               auth.anyRequest().authenticated();
             })
-        .csrf(
-            csrf ->
-                csrf.csrfTokenRepository(csrfTokenRepository)
-                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers(
-                        CsrfExemptions.headerlessAuthentication("/login"),
-                        new AntPathRequestMatcher("/mail", "POST")))
-        .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
+        // MEASUREMENT BRANCH ONLY: see the note in the WebGoat config. Do not merge.
+        .csrf(csrf -> csrf.disable())
         .formLogin(
             login ->
                 login

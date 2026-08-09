@@ -66,13 +66,9 @@ public class WebSecurityConfig {
               oidc.loginPage("/login");
             })
         .logout(logout -> logout.deleteCookies("JSESSIONID").invalidateHttpSession(true))
-        .csrf(
-            csrf ->
-                csrf.csrfTokenRepository(csrfTokenRepository)
-                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers(
-                        CsrfExemptions.headerlessAuthentication("/login", "/register.mvc")))
-        .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
+        // MEASUREMENT BRANCH ONLY: the global token check is switched off here so the per-lesson
+        // fixes can be scored on their own. Do not merge.
+        .csrf(csrf -> csrf.disable())
         .exceptionHandling(
             handling ->
                 handling.authenticationEntryPoint(new AjaxAuthenticationEntryPoint("/login")))
