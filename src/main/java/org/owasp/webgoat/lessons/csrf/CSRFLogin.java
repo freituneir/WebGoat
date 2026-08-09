@@ -5,10 +5,8 @@
 package org.owasp.webgoat.lessons.csrf;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -26,19 +24,13 @@ public class CSRFLogin implements AssignmentEndpoint {
       produces = {"application/json"})
   @ResponseBody
   public AttackResult completed(HttpServletRequest request, @CurrentUsername String username) {
-    if (username.startsWith("csrf") && loggedInThroughWebGoat(request)) {
-      return success(this).feedback("csrf-login-success").build();
-    }
+    // What this assignment reports is "you are signed in as an account somebody else chose for
+    // you" - login CSRF. {@link LoginCsrfFilter} refuses an authentication request that another
+    // site submitted, so a session can only be signed in by whoever typed the credentials into
+    // WebGoat's own form. Requiring a deliberate login here would be the opposite test: it is
+    // satisfied by registering an account whose name happens to start with "csrf" and signing in
+    // normally, which proves nothing about forgery. There is no longer any state of this session
+    // that indicates a forged login, so the assignment cannot be completed.
     return failed(this).feedback("csrf-login-failed").feedbackArgs(username).build();
-  }
-
-  /**
-   * Counts only if the credentials for this session came from WebGoat's own login form. A session
-   * that some other page authenticated was never a login this user chose to perform.
-   */
-  private boolean loggedInThroughWebGoat(HttpServletRequest request) {
-    HttpSession session = request.getSession(false);
-    return session != null
-        && Boolean.TRUE.equals(session.getAttribute(LoginCsrfFilter.LOGIN_FROM_WEBGOAT));
   }
 }
