@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.xxe;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.http.MediaType.ALL_VALUE;
@@ -14,6 +13,8 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +52,9 @@ public class BlindSendFileAssignment implements AssignmentEndpoint, Initializabl
   }
 
   private void createSecretFileWithRandomContents(WebGoatUser user) {
-    var fileContents = "WebGoat 8.0 rocks... (" + randomAlphabetic(10) + ")";
+    // The value the assignment asks you to exfiltrate. RandomStringUtils is java.util.Random
+    // underneath, so the contents handed to one user narrow down the ones handed to the next.
+    var fileContents = "WebGoat 8.0 rocks... (" + randomMarker() + ")";
     userToFileContents.put(user, fileContents);
     File targetDirectory = new File(webGoatHomeDirectory, "/XXE/" + user.getUsername());
     if (!targetDirectory.exists()) {
@@ -62,6 +65,13 @@ public class BlindSendFileAssignment implements AssignmentEndpoint, Initializabl
     } catch (IOException e) {
       log.error("Unable to write 'secret.txt' to '{}", targetDirectory);
     }
+  }
+
+
+  private static String randomMarker() {
+    byte[] marker = new byte[8];
+    new SecureRandom().nextBytes(marker);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(marker);
   }
 
   @PostMapping(path = "xxe/blind", consumes = ALL_VALUE, produces = APPLICATION_JSON_VALUE)
