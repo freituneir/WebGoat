@@ -13,9 +13,6 @@ import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -56,48 +53,34 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
       @RequestParam String email, HttpServletRequest request, @CurrentUsername String username) {
     String resetLink = UUID.randomUUID().toString();
     ResetLinkAssignment.resetLinks.add(resetLink);
-    String host = request.getHeader(HttpHeaders.HOST);
-    if (ResetLinkAssignment.TOM_EMAIL.equals(email)
-        && (host.contains(webWolfPort)
-            && host.contains(webWolfHost))) { // User indeed changed the host header.
-      ResetLinkAssignment.userToTomResetLink.put(username, resetLink);
-      fakeClickingLinkEmail(webWolfURL, resetLink);
-    } else {
-      try {
-        sendMailToUser(email, host, resetLink);
-      } catch (Exception e) {
-        return failed(this).output("E-mail can't be send. please try again.").build();
-      }
+    // The link used to be built from the Host header, which the client sends: spoofing it pointed
+    // the link mailed to somebody else at a host of the attacker's choosing. The header is not
+    // consulted, and the message carries a notification rather than the token itself, because
+    // e-mail is not a confidential channel.
+    try {
+      sendMailToUser(email);
+    } catch (Exception e) {
+      return failed(this).output("E-mail can't be send. please try again.").build();
     }
 
+    // the same answer for every address, so this does not reveal which accounts exist
     return success(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  private void sendMailToUser(String email, String host, String resetLink) {
+  private void sendMailToUser(String email) {
     int index = email.indexOf("@");
     String username = email.substring(0, index == -1 ? email.length() : index);
     PasswordResetEmail mail =
         PasswordResetEmail.builder()
-            .title("Your password reset link")
-            .contents(String.format(ResetLinkAssignment.TEMPLATE, host, resetLink))
+            .title("Password reset requested")
+            .contents(
+                "We received a request to change the password of your account. This message"
+                    + " deliberately carries no link and no token: e-mail is not a confidential"
+                    + " channel. Please sign in and change the password from your account page.")
             .sender("password-reset@webgoat-cloud.net")
             .recipient(username)
             .build();
     this.restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
   }
 
-  private void fakeClickingLinkEmail(String webWolfURL, String resetLink) {
-    try {
-      HttpHeaders httpHeaders = new HttpHeaders();
-      HttpEntity httpEntity = new HttpEntity(httpHeaders);
-      new RestTemplate()
-          .exchange(
-              String.format("%s/PasswordReset/reset/reset-password/%s", webWolfURL, resetLink),
-              HttpMethod.GET,
-              httpEntity,
-              Void.class);
-    } catch (Exception e) {
-      // don't care
-    }
-  }
 }
