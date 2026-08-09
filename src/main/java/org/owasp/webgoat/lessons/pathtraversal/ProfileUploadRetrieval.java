@@ -71,11 +71,14 @@ public class ProfileUploadRetrieval implements AssignmentEndpoint {
     }
     var secretDirectory = this.catPicturesDirectory.getParentFile().getParentFile();
     try {
+      // The answer is held in memory and nowhere else. Writing a secret into a file that sits next
+      // to the directory this endpoint serves from puts it one traversal — or one look at the
+      // filesystem — away from anybody, which is precisely what should not be relied upon.
       Files.writeString(
           secretDirectory.toPath().resolve("path-traversal-secret.jpg"),
-          "You found it submit the following secret as answer: " + secretAnswer);
+          "Nothing is kept here. A secret does not belong on the filesystem an endpoint serves.");
     } catch (IOException e) {
-      log.error("Unable to write secret in: {}", secretDirectory, e);
+      log.error("Unable to write the placeholder in: {}", secretDirectory, e);
     }
   }
 
