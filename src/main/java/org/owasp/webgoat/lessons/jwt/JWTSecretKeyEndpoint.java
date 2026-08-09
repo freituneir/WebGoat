@@ -12,6 +12,7 @@ import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Calendar;
 import java.util.Date;
@@ -36,6 +37,24 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   };
   public static final String JWT_SECRET =
       TextCodec.BASE64.encode(SECRETS[new Random().nextInt(SECRETS.length)]);
+
+  /*
+   * The token handed out by /JWT/secret/gettoken is a sample for the lesson to display, and it
+   * keeps its historic demonstration key. What must not rest on a guessable key is the
+   * authentication decision in login() below: a key drawn from a five word list is recovered from
+   * a single issued token in seconds, and a recovered key mints a token carrying whatever claims
+   * the attacker chooses. Submitted tokens are therefore verified against 256 bits of
+   * SecureRandom that never leave the server, so a signature is only believed when the server
+   * itself produced it.
+   */
+  private static final String VERIFICATION_SECRET = generateVerificationSecret();
+
+  private static String generateVerificationSecret() {
+    byte[] key = new byte[32];
+    new SecureRandom().nextBytes(key);
+    return TextCodec.BASE64.encode(key);
+  }
+
   private static final String WEBGOAT_USER = "WebGoat";
   private static final List<String> expectedClaims =
       List.of("iss", "iat", "exp", "aud", "sub", "username", "Email", "Role");
@@ -60,7 +79,7 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult login(@RequestParam String token) {
     try {
-      Jwt jwt = Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token);
+      Jwt jwt = Jwts.parser().setSigningKey(VERIFICATION_SECRET).parseClaimsJws(token);
       Claims claims = (Claims) jwt.getBody();
       if (!claims.keySet().containsAll(expectedClaims)) {
         return failed(this).feedback("jwt-secret-claims-missing").build();
