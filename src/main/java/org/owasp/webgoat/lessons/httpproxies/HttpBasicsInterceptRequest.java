@@ -29,7 +29,15 @@ public class HttpBasicsInterceptRequest implements AssignmentEndpoint {
       @RequestHeader(value = "x-request-intercepted", required = false) Boolean headerValue,
       @RequestParam(value = "changeMe", required = false) String paramValue,
       HttpServletRequest request) {
-    if (HttpMethod.POST.matches(request.getMethod())) {
+    // The outcome was recorded on a GET and refused on a POST, so the way to complete the
+    // exercise was to change the verb. GET is defined as safe: browsers, proxies and caches may
+    // repeat it, prefetch it and replay it from history, and it carries no CSRF token because
+    // nothing about it is meant to change state. A request that records a result is not safe, so
+    // it has to be the POST the form already sends -- the gate is the same one challenge 8 needed.
+    //
+    // Interception is still what solves this: the header and the parameter have to be edited in
+    // flight, the request simply stays a POST while it happens.
+    if (!HttpMethod.POST.matches(request.getMethod())) {
       return failed(this).feedback("http-proxies.intercept.failure").build();
     }
     if (headerValue != null
