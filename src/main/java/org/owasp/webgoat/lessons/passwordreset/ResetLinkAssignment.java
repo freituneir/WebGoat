@@ -51,6 +51,10 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   static Map<String, String> userToTomResetLink = new HashMap<>();
   static Map<String, String> usersToTomPassword = Maps.newHashMap();
   static List<String> resetLinks = new ArrayList<>();
+  /* The account each outstanding reset link was issued for. A reset token is a bearer credential
+     for exactly one account: holding it is not the same as owning that account, so redeeming it
+     has to be checked against the address it was minted for and not against whoever presents it. */
+  static Map<String, String> resetLinkRecipients = new HashMap<>();
 
   static final String TEMPLATE =
       """
@@ -114,15 +118,21 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
       return modelAndView;
     }
-    if (checkIfLinkIsFromTom(form.getResetLink(), username)) {
+    /* A reset link is spent once, whether or not it turns out to change anything */
+    resetLinks.remove(form.getResetLink());
+    String recipient = resetLinkRecipients.remove(form.getResetLink());
+    /* The link changes the password of the account it was issued for, and only when the person
+       redeeming it is that account. Previously it changed Tom's password for whoever presented a
+       link that had been issued in Tom's name, which is what turns an intercepted reset mail into
+       a full account takeover: the interceptor never has to be Tom. */
+    if (TOM_EMAIL.equals(recipient) && isTom(username)) {
       usersToTomPassword.put(username, form.getPassword());
     }
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
   }
 
-  private boolean checkIfLinkIsFromTom(String resetLinkFromForm, String username) {
-    String resetLink = userToTomResetLink.getOrDefault(username, "unknown");
-    return resetLink.equals(resetLinkFromForm);
+  private boolean isTom(String username) {
+    return username != null && TOM_EMAIL.equalsIgnoreCase(username);
   }
 }
