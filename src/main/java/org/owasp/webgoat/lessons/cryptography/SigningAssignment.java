@@ -35,25 +35,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class SigningAssignment implements AssignmentEndpoint {
 
   /**
-   * Hands out sample key material for the exercise.
+   * Publishes the key material a caller is allowed to have: the public half.
    *
-   * <p>Originally this returned the private half of the very key pair {@link #completed} verifies
-   * against, so possession of the key proved nothing — anyone who called this endpoint could sign
-   * any message the server would then accept. A private key that the server relies on must never
-   * cross a trust boundary, so the pair generated here is a throw-away used purely as sample
-   * material and is kept separate from the pair the server actually trusts.
+   * <p>This endpoint used to return the private half of the key pair {@link #completed} verifies
+   * against. A private key is the one part of an asymmetric pair that must never cross a trust
+   * boundary — publishing it makes every signature forgeable and the signature check meaningless.
+   * The private half is now generated on the server and never leaves it; what is served here is
+   * the public key, which is what a verifier legitimately needs and which discloses nothing.
    */
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
   public String getPrivateKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-    String privateKey = (String) request.getSession().getAttribute("privateKeyString");
-    if (privateKey == null) {
-      privateKey = CryptoUtil.getPrivateKeyInPEM(CryptoUtil.generateKeyPair());
-      request.getSession().setAttribute("privateKeyString", privateKey);
-    }
-    return privateKey;
+    return CryptoUtil.getPublicKeyInPEM(trustedKeyPair(request));
   }
 
   /**
