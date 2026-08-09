@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.HtmlUtils;
 
 @RestController
 public class LogSpoofingTask implements AssignmentEndpoint {
@@ -25,16 +24,13 @@ public class LogSpoofingTask implements AssignmentEndpoint {
     if (Strings.isEmpty(username)) {
       return failed(this).output(username).build();
     }
+    username = username.replace("\n", "<br/>");
     if (username.contains("<p>") || username.contains("<div>")) {
       return failed(this).output("Try to think of something simple ").build();
     }
-    // An entry has to stay on its own line and must not be read back as markup, otherwise the
-    // caller writes log lines of its own. Line breaks are flattened and the value is encoded.
-    String logEntry = HtmlUtils.htmlEscape(username.replace('\r', ' ').replace('\n', ' '));
-    int lineBreak = logEntry.indexOf("<br/>");
-    if (lineBreak >= 0 && lineBreak < logEntry.indexOf("admin")) {
-      return success(this).output(logEntry).build();
+    if (username.indexOf("<br/>") < username.indexOf("admin")) {
+      return success(this).output(username).build();
     }
-    return failed(this).output(logEntry).build();
+    return failed(this).output(username).build();
   }
 }
