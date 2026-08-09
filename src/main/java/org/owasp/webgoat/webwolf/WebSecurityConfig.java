@@ -81,8 +81,10 @@ public class WebSecurityConfig {
     return authenticationConfiguration.getAuthenticationManager();
   }
 
+  // static so that resolving it does not require building this configuration class, which takes
+  // UserService, which now asks for the encoder - a cycle Spring refuses to start with
   @Bean
-  public NoOpPasswordEncoder passwordEncoder() {
+  public static NoOpPasswordEncoder passwordEncoder() {
     return (NoOpPasswordEncoder) NoOpPasswordEncoder.getInstance();
   }
 }
