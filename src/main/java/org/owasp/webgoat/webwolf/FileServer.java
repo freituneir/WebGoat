@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -54,13 +55,18 @@ public class FileServer {
   @Value("${server.port}")
   private int port;
 
+  /**
+   * The absolute path the uploads live under is server-side detail. Publishing it names the account
+   * the process runs as and gives anything that can influence a path elsewhere a target to aim at,
+   * so the location is no longer returned.
+   */
   @RequestMapping(
       path = "/file-server-location",
       consumes = ALL_VALUE,
       produces = MediaType.TEXT_PLAIN_VALUE)
   @ResponseBody
-  public String getFileLocation() {
-    return fileLocation;
+  public ResponseEntity<Void> getFileLocation() {
+    return ResponseEntity.notFound().build();
   }
 
   @PostMapping(value = "/fileupload")
