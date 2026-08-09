@@ -34,19 +34,21 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class SigningAssignment implements AssignmentEndpoint {
 
+  /*
+   * A private key is server-only material. Anything holding it can produce a signature this
+   * application will accept, so it is not written into a response at all - not the key, and not a
+   * substitute key either. The pair is still generated per session and kept on the server so that
+   * verification below has something to check against; nothing about it leaves the process.
+   */
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
   public String getPrivateKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-    String privateKey = (String) request.getSession().getAttribute("privateKeyString");
-    if (privateKey == null) {
-      KeyPair keyPair = CryptoUtil.generateKeyPair();
-      privateKey = CryptoUtil.getPrivateKeyInPEM(keyPair);
-      request.getSession().setAttribute("privateKeyString", privateKey);
-      request.getSession().setAttribute("keyPair", keyPair);
+    if (request.getSession().getAttribute("keyPair") == null) {
+      request.getSession().setAttribute("keyPair", CryptoUtil.generateKeyPair());
     }
-    return privateKey;
+    return "";
   }
 
   @PostMapping("/crypto/signing/verify")
