@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.bypassrestrictions;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -38,27 +37,17 @@ public class BypassRestrictionsFrontendValidation implements AssignmentEndpoint 
     if (error > 0) {
       return failed(this).build();
     }
-    if (field1.matches(regex1)) {
-      return failed(this).build();
+    // The browser side validation is repeated on the server. Input in the wrong format is
+    // rejected here, rather than trusted because a script claimed it had already been checked.
+    if (!field1.matches(regex1)
+        || !field2.matches(regex2)
+        || !field3.matches(regex3)
+        || !field4.matches(regex4)
+        || !field5.matches(regex5)
+        || !field6.matches(regex6)
+        || !field7.matches(regex7)) {
+      return failed(this).feedback("bypass-restrictions.intercept.failure").build();
     }
-    if (field2.matches(regex2)) {
-      return failed(this).build();
-    }
-    if (field3.matches(regex3)) {
-      return failed(this).build();
-    }
-    if (field4.matches(regex4)) {
-      return failed(this).build();
-    }
-    if (field5.matches(regex5)) {
-      return failed(this).build();
-    }
-    if (field6.matches(regex6)) {
-      return failed(this).build();
-    }
-    if (field7.matches(regex7)) {
-      return failed(this).build();
-    }
-    return success(this).build();
+    return failed(this).build();
   }
 }

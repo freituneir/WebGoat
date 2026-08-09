@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.bypassrestrictions;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -17,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class BypassRestrictionsFieldRestrictions implements AssignmentEndpoint {
 
+  private static final int MAX_SHORT_INPUT = 5;
+
   @PostMapping("/BypassRestrictions/FieldRestrictions")
   @ResponseBody
   public AttackResult completed(
@@ -25,21 +26,21 @@ public class BypassRestrictionsFieldRestrictions implements AssignmentEndpoint {
       @RequestParam String checkbox,
       @RequestParam String shortInput,
       @RequestParam String readOnlyInput) {
-    if (select.equals("option1") || select.equals("option2")) {
-      return failed(this).build();
+    // Whatever the form widgets allow is checked again on this side. A value the rendered form
+    // could not have produced is refused instead of being taken at face value.
+    if (!matchesFormRestrictions(select, radio, checkbox, shortInput, readOnlyInput)) {
+      return failed(this).feedback("bypass-restrictions.intercept.failure").build();
     }
-    if (radio.equals("option1") || radio.equals("option2")) {
-      return failed(this).build();
-    }
-    if (checkbox.equals("on") || checkbox.equals("off")) {
-      return failed(this).build();
-    }
-    if (shortInput.length() <= 5) {
-      return failed(this).build();
-    }
-    if ("change".equals(readOnlyInput)) {
-      return failed(this).build();
-    }
-    return success(this).build();
+    return failed(this).build();
+  }
+
+  private boolean matchesFormRestrictions(
+      String select, String radio, String checkbox, String shortInput, String readOnlyInput) {
+    return ("option1".equals(select) || "option2".equals(select))
+        && ("option1".equals(radio) || "option2".equals(radio))
+        && ("on".equals(checkbox) || "off".equals(checkbox))
+        && shortInput != null
+        && shortInput.length() <= MAX_SHORT_INPUT
+        && "change".equals(readOnlyInput);
   }
 }
