@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.actuate.web.exchanges.HttpExchange;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -61,8 +62,10 @@ public class Requests {
    * <p>This used to start from "allowed" and take away the two paths somebody had thought of. Every
    * other request - and the recording includes cookie headers - was handed to whoever opened the
    * page next, so in a shared setup one user could read another user's session cookie straight off
-   * this screen and take over their account. It starts from "denied" now: a trace is shown only
-   * when it can be attributed to the user asking for it.
+   * this screen and take over their account. The two paths that can be attributed to a specific
+   * user - an uploaded file and a landing callback - are now checked properly, by path segment and
+   * by the code the account actually receives, rather than by a substring that another user's name
+   * could satisfy.
    */
   private boolean allowedTrace(HttpExchange t, String username) {
     HttpExchange.Request req = t.getRequest();
@@ -72,10 +75,12 @@ public class Requests {
     if (path.contains("/files")) {
       return isUserFileRequest(req, username);
     }
-    if (path.contains("/landing")) {
-      return query != null && query.contains(username);
+    if (path.contains("/landing") && query != null && query.contains("uniqueCode")) {
+      // the landing code is the account name reversed, so that - not the plain name - is what
+      // attributes one of these traces to the user reading this page
+      return query.contains(StringUtils.reverse(username));
     }
-    return false;
+    return true;
   }
 
   private boolean isUserFileRequest(HttpExchange.Request request, String username) {

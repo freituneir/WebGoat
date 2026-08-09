@@ -5,6 +5,7 @@
 package org.owasp.webgoat.lessons.passwordreset;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.util.StringUtils.hasText;
 
 import java.util.List;
@@ -44,20 +45,22 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
 
   private static final String VIEW_FORMATTER = "lessons/passwordreset/templates/%s.html";
   static final String TOM_EMAIL = "tom@webgoat-cloud.org";
+  static final String PASSWORD_TOM_9 =
+      "somethingVeryRandomWhichNoOneWillEverTypeInAsPasswordForTom";
   static List<String> resetLinks = new CopyOnWriteArrayList<>();
   static Map<String, String> resetLinkOwners = new ConcurrentHashMap<>();
+  static Map<String, String> passwordsByEmail = new ConcurrentHashMap<>();
 
-  // Mail is not a confidential channel, so this notification carries neither the token nor a
-  // link built out of it. Otherwise reading somebody's mailbox is the same as owning their
-  // account. The token stays here, tied to the account it was made for, and the reset is
-  // finished from inside the application by whoever is signed in to that account.
+  // The mail still carries a working reset link — that is the flow this lesson teaches. What it no
+  // longer carries is an address the requester chose: the host comes from this server's own
+  // configuration, so spoofing the Host header cannot aim somebody else's link at a machine the
+  // attacker controls, and the link is only ever delivered to the mailbox of the account it was
+  // issued for.
   static final String TEMPLATE =
       """
-      Hello,
-
-      We received a request to change the password of your account. For your own safety this
-       message carries no credentials and no address that can be used to continue, we will never
-       send those by e-mail. Please sign in and change the password from your own account page.
+      Hi, you requested a password reset link, please use this <a target='_blank'
+       href='http://%s/WebGoat/PasswordReset/reset/reset-password/%s'>link</a> to reset your
+       password.
 
       If you did not request this password change you can ignore this message.
       If you have any comments or questions, please do not hesitate to reach us at
@@ -70,12 +73,15 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   @PostMapping("/PasswordReset/reset/login")
   @ResponseBody
   public AttackResult login(@RequestParam String password, @RequestParam String email) {
-    // A link is delivered to the mailbox of the account it was made for and works for that
-    // account only, so somebody else's password is never learned here.
-    if (TOM_EMAIL.equals(email)) {
-      return failed(this).feedback("login_failed").build();
+    // A password only exists here once the owner of that mailbox redeemed the link that was
+    // delivered to it. Holding a link issued for somebody else never gets an entry in this map,
+    // so this answers the ordinary "wrong password" way rather than by refusing to play.
+    String currentPassword = passwordsByEmail.getOrDefault(email, PASSWORD_TOM_9);
+    if (!PASSWORD_TOM_9.equals(currentPassword) && currentPassword.equals(password)) {
+      return success(this).build();
     }
-    return failed(this).feedback("login_failed.tom").build();
+    return failed(this).feedback(TOM_EMAIL.equals(email) ? "login_failed" : "login_failed.tom")
+        .build();
   }
 
   @GetMapping("/PasswordReset/reset/reset-password/{link}")
@@ -113,6 +119,8 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
       return modelAndView;
     }
+    // the reset really happens, so the lesson works end to end for the account that owns the link
+    passwordsByEmail.put(resetLinkOwners.get(form.getResetLink()), form.getPassword());
     // and it is spent after one use
     resetLinks.remove(form.getResetLink());
     resetLinkOwners.remove(form.getResetLink());
