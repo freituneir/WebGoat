@@ -7,6 +7,7 @@ package org.owasp.webgoat.lessons.csrf;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -30,7 +31,14 @@ public class CSRFConfirmFlag1 implements AssignmentEndpoint {
       path = "/csrf/confirm-flag-1",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(String confirmFlagVal) {
+  public AttackResult completed(String confirmFlagVal, HttpServletRequest request) {
+    // The flag this confirms is only obtainable by getting a state-changing request accepted from
+    // somewhere else, so confirming it is itself a state change and is held to the same rule: the
+    // request has to prove it started in WebGoat. OriginCheck treats "no Origin and no Referer" as
+    // unproven rather than trusted, which is the case the original lesson rewarded.
+    if (!OriginCheck.fromThisApplication(request)) {
+      return failed(this).build();
+    }
     Object userSessionDataStr = userSessionData.getValue("csrf-get-success");
     if (userSessionDataStr != null && confirmFlagVal.equals(userSessionDataStr.toString())) {
       return success(this)
