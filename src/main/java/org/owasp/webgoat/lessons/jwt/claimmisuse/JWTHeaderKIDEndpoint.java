@@ -13,7 +13,7 @@ import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SigningKeyResolverAdapter;
-import java.security.SecureRandom;
+import io.jsonwebtoken.impl.TextCodec;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import org.apache.commons.lang3.StringUtils;
@@ -39,22 +39,10 @@ import org.springframework.web.bind.annotation.RestController;
 })
 @RequestMapping("/JWT/")
 public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
-  private static final String KEY_LOOKUP = "SELECT key FROM jwt_keys WHERE id = ?";
-  // The key is drawn at startup and stays here. The 'kid' header is used for one thing only,
-  // asking whether that key id exists; the value in the table ships with the repository, so it
-  // is not something a signature may be checked against.
-  private static final byte[] SERVER_SIGNING_KEY = randomSigningKey();
-
   private final LessonDataSource dataSource;
 
   private JWTHeaderKIDEndpoint(LessonDataSource dataSource) {
     this.dataSource = dataSource;
-  }
-
-  private static byte[] randomSigningKey() {
-    byte[] key = new byte[64];
-    new SecureRandom().nextBytes(key);
-    return key;
   }
 
   @PostMapping("kid/follow/{user}")
@@ -80,13 +68,14 @@ public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
                       @Override
                       public byte[] resolveSigningKeyBytes(JwsHeader header, Claims claims) {
                         final String kid = (String) header.get("kid");
-                        try (var connection = dataSource.getConnection();
-                            var statement = connection.prepareStatement(KEY_LOOKUP)) {
-                          statement.setString(1, kid);
-                          try (ResultSet rs = statement.executeQuery()) {
-                            if (rs.next()) {
-                              return SERVER_SIGNING_KEY.clone();
-                            }
+                        try (var connection = dataSource.getConnection()) {
+                          ResultSet rs =
+                              connection
+                                  .createStatement()
+                                  .executeQuery(
+                                      "SELECT key FROM jwt_keys WHERE id = '" + kid + "'");
+                          while (rs.next()) {
+                            return TextCodec.BASE64.decode(rs.getString(1));
                           }
                         } catch (SQLException e) {
                           errorMessage[0] = e.getMessage();
@@ -108,7 +97,7 @@ public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
         } else {
           return failed(this).feedback("jwt-final-not-tom").build();
         }
-      } catch (JwtException | IllegalArgumentException e) {
+      } catch (JwtException e) {
         return failed(this).feedback("jwt-invalid-token").output(e.toString()).build();
       }
     }

@@ -11,22 +11,18 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -56,39 +52,11 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class JWTVotesEndpoint implements AssignmentEndpoint {
 
-  // 512 random bits, not a dictionary word that a laptop cracks in seconds
-  public static final String JWT_PASSWORD = randomSigningKey();
-  private static final Set<String> KNOWN_USERS = Set.of("Tom", "Jerry", "Sylvester");
+  public static final String JWT_PASSWORD = TextCodec.BASE64.encode("victory");
+  private static String validUsers = "TomJerrySylvester";
 
   private static int totalVotes = 38929;
   private final Map<String, Vote> votes = new HashMap<>();
-
-  private static String randomSigningKey() {
-    byte[] key = new byte[64];
-    new SecureRandom().nextBytes(key);
-    return TextCodec.BASE64.encode(Base64.getEncoder().encodeToString(key));
-  }
-
-  // The signature has to verify with the key and the algorithm this server picked. An unsigned
-  // token ("alg": "none") or one signed with something else does not get through.
-  private static Claims verifiedClaims(String accessToken) {
-    Jws<Claims> jws = Jwts.parser().setSigningKey(JWT_PASSWORD).parseClaimsJws(accessToken);
-    if (!SignatureAlgorithm.HS512.getValue().equals(jws.getHeader().getAlgorithm())) {
-      throw new JwtException("Unexpected signing algorithm");
-    }
-    return jws.getBody();
-  }
-
-  /** Accounts allowed to administer the voting. Held here, never read out of a token. */
-  private static final Set<String> ADMINISTRATORS = Set.of();
-
-  private static boolean hasAdminRole(String user) {
-    return user != null && ADMINISTRATORS.contains(user);
-  }
-
-  private static boolean isKnownUser(String user) {
-    return user != null && KNOWN_USERS.contains(user);
-  }
 
   @PostConstruct
   public void initVotes() {
@@ -134,7 +102,7 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
 
   @GetMapping("/JWT/votings/login")
   public void login(@RequestParam("user") String user, HttpServletResponse response) {
-    if (isKnownUser(user)) {
+    if (validUsers.contains(user)) {
       Claims claims = Jwts.claims().setIssuedAt(Date.from(Instant.now().plus(Duration.ofDays(10))));
       claims.put("admin", "false");
       claims.put("user", user);
@@ -144,19 +112,11 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
               .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
               .compact();
       Cookie cookie = new Cookie("access_token", token);
-      // The access token is the credential for this lesson's API. Script running in the page has
-      // no reason to read it, and it should not travel over a plaintext connection.
-      cookie.setHttpOnly(true);
-      cookie.setSecure(true);
-      cookie.setPath("/WebGoat");
       response.addCookie(cookie);
       response.setStatus(HttpStatus.OK.value());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     } else {
       Cookie cookie = new Cookie("access_token", "");
-      cookie.setHttpOnly(true);
-      cookie.setSecure(true);
-      cookie.setPath("/WebGoat");
       response.addCookie(cookie);
       response.setStatus(HttpStatus.UNAUTHORIZED.value());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -176,14 +136,15 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
       value.setSerializationView(Views.GuestView.class);
     } else {
       try {
-        Claims claims = verifiedClaims(accessToken);
+        Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
+        Claims claims = (Claims) jwt.getBody();
         String user = (String) claims.get("user");
-        if ("Guest".equals(user) || !isKnownUser(user)) {
+        if ("Guest".equals(user) || !validUsers.contains(user)) {
           value.setSerializationView(Views.GuestView.class);
         } else {
           value.setSerializationView(Views.UserView.class);
         }
-      } catch (JwtException | IllegalArgumentException e) {
+      } catch (JwtException e) {
         value.setSerializationView(Views.GuestView.class);
       }
     }
@@ -200,15 +161,16 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     } else {
       try {
-        Claims claims = verifiedClaims(accessToken);
+        Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
+        Claims claims = (Claims) jwt.getBody();
         String user = (String) claims.get("user");
-        if (!isKnownUser(user)) {
+        if (!validUsers.contains(user)) {
           return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         } else {
           ofNullable(votes.get(title)).ifPresent(v -> v.incrementNumberOfVotes(totalVotes));
           return ResponseEntity.accepted().build();
         }
-      } catch (JwtException | IllegalArgumentException e) {
+      } catch (JwtException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
       }
     }
@@ -222,18 +184,16 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
       return failed(this).feedback("jwt-invalid-token").build();
     } else {
       try {
-        Claims claims = verifiedClaims(accessToken);
-        // The "admin" claim travels in the token, so it says what the holder of the token wants it
-        // to say - it is an assertion by the caller, not a decision by this server. The role is
-        // looked up here from the account the token identifies. None of the voting accounts is an
-        // administrator, so resetting the tally is refused whatever the token claims.
-        if (!hasAdminRole((String) claims.get("user"))) {
+        Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
+        Claims claims = (Claims) jwt.getBody();
+        boolean isAdmin = Boolean.valueOf(String.valueOf(claims.get("admin")));
+        if (!isAdmin) {
           return failed(this).feedback("jwt-only-admin").build();
         } else {
           votes.values().forEach(vote -> vote.reset());
           return success(this).build();
         }
-      } catch (JwtException | IllegalArgumentException e) {
+      } catch (JwtException e) {
         return failed(this).feedback("jwt-invalid-token").output(e.toString()).build();
       }
     }

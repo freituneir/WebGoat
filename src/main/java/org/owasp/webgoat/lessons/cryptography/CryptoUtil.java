@@ -4,6 +4,7 @@
  */
 package org.owasp.webgoat.lessons.cryptography;
 
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyFactory;
@@ -12,6 +13,7 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -24,25 +26,23 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CryptoUtil {
 
+  private static final BigInteger[] FERMAT_PRIMES = {
+    BigInteger.valueOf(3),
+    BigInteger.valueOf(5),
+    BigInteger.valueOf(17),
+    BigInteger.valueOf(257),
+    BigInteger.valueOf(65537)
+  };
+
   public static KeyPair generateKeyPair()
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-    /* fixed on the standard public exponent, the small Fermat primes weaken the key */
-    RSAKeyGenParameterSpec kpgSpec = new RSAKeyGenParameterSpec(2048, RSAKeyGenParameterSpec.F4);
+    RSAKeyGenParameterSpec kpgSpec =
+        new RSAKeyGenParameterSpec(
+            2048, FERMAT_PRIMES[new SecureRandom().nextInt(FERMAT_PRIMES.length)]);
     keyPairGenerator.initialize(kpgSpec);
+    // keyPairGenerator.initialize(2048);
     return keyPairGenerator.generateKeyPair();
-  }
-
-  public static String getPublicKeyInPEM(KeyPair keyPair) {
-    String encodedString = "-----BEGIN PUBLIC KEY-----\n";
-    encodedString =
-        encodedString
-            + new String(
-                Base64.getEncoder().encode(keyPair.getPublic().getEncoded()),
-                Charset.forName("UTF-8"))
-            + "\n";
-    encodedString = encodedString + "-----END PUBLIC KEY-----\n";
-    return encodedString;
   }
 
   public static String getPrivateKeyInPEM(KeyPair keyPair) {
