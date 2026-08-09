@@ -105,6 +105,6 @@ public class MissingFunctionACUsers {
       return false;
     }
     var currentUser = userRepository.findByUsername(username);
-    return currentUser != null && currentUser.hasAdminRole();
+    return currentUser != null && currentUser.isAdmin();
   }
 }
