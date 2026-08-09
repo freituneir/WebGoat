@@ -10,6 +10,8 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -40,8 +42,13 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
       "Cookie details for user %s:<br />" + COOKIE_NAME + "=%s";
   private static final String ATTACK_USERNAME = "tom";
 
+  /*
+   * The target account's password used to sit here in the source, which means it was published
+   * with every copy of the application. It is drawn at random on startup instead: the point of
+   * this lesson is the cookie, and nobody should be able to read tom's password out of the jar.
+   */
   private static final Map<String, String> users =
-      Map.of("webgoat", "webgoat", "admin", "admin", ATTACK_USERNAME, "apasswordfortom");
+      Map.of("webgoat", "webgoat", "admin", "admin", ATTACK_USERNAME, randomPassword());
 
   @PostMapping(path = "/SpoofCookie/login")
   @ResponseBody
@@ -57,6 +64,12 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
     } else {
       return cookieLoginFlow(cookieValue);
     }
+  }
+
+  private static String randomPassword() {
+    byte[] password = new byte[24];
+    new SecureRandom().nextBytes(password);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(password);
   }
 
   @GetMapping(path = "/SpoofCookie/cleanup")
@@ -80,6 +93,8 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
       Cookie newCookie = new Cookie(COOKIE_NAME, newCookieValue);
       newCookie.setPath("/WebGoat");
       newCookie.setSecure(true);
+      // script in the page has no business reading an authentication cookie
+      newCookie.setHttpOnly(true);
       response.addCookie(newCookie);
       return informationMessage(this)
           .feedback("spoofcookie.login")

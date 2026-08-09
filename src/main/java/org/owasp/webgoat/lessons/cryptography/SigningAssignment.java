@@ -34,19 +34,23 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class SigningAssignment implements AssignmentEndpoint {
 
+  /*
+   * One key pair per session, and only its public half is ever written to a response. Give out
+   * the private half and anybody can sign on behalf of this application.
+   */
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
-  public String getPrivateKey(HttpServletRequest request)
+  public String getPublicKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
-    String privateKey = (String) request.getSession().getAttribute("privateKeyString");
-    if (privateKey == null) {
+    String publicKey = (String) request.getSession().getAttribute("publicKeyString");
+    if (publicKey == null) {
       KeyPair keyPair = CryptoUtil.generateKeyPair();
-      privateKey = CryptoUtil.getPrivateKeyInPEM(keyPair);
-      request.getSession().setAttribute("privateKeyString", privateKey);
+      publicKey = CryptoUtil.getPublicKeyInPEM(keyPair);
+      request.getSession().setAttribute("publicKeyString", publicKey);
       request.getSession().setAttribute("keyPair", keyPair);
     }
-    return privateKey;
+    return publicKey;
   }
 
   @PostMapping("/crypto/signing/verify")
@@ -57,6 +61,9 @@ public class SigningAssignment implements AssignmentEndpoint {
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
     KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null) {
+      return failed(this).feedback("crypto-signing.modulusnotok").build();
+    }
     RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);
