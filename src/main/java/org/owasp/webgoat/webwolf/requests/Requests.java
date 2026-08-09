@@ -11,7 +11,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.actuate.web.exchanges.HttpExchange;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -56,20 +55,27 @@ public class Requests {
     return model;
   }
 
+  /**
+   * Decides whether a recorded request may be shown to the user asking for this page.
+   *
+   * <p>This used to start from "allowed" and take away the two paths somebody had thought of. Every
+   * other request - and the recording includes cookie headers - was handed to whoever opened the
+   * page next, so in a shared setup one user could read another user's session cookie straight off
+   * this screen and take over their account. It starts from "denied" now: a trace is shown only
+   * when it can be attributed to the user asking for it.
+   */
   private boolean allowedTrace(HttpExchange t, String username) {
     HttpExchange.Request req = t.getRequest();
-    boolean allowed = true;
-    /* do not show certain traces to other users in a classroom setup */
-    if (req.getUri().getPath().contains("/files") && !isUserFileRequest(req, username)) {
-      allowed = false;
-    } else if (req.getUri().getPath().contains("/landing")
-        && req.getUri().getQuery() != null
-        && req.getUri().getQuery().contains("uniqueCode")
-        && !req.getUri().getQuery().contains(StringUtils.reverse(username))) {
-      allowed = false;
-    }
+    String path = req.getUri().getPath();
+    String query = req.getUri().getQuery();
 
-    return allowed;
+    if (path.contains("/files")) {
+      return isUserFileRequest(req, username);
+    }
+    if (path.contains("/landing")) {
+      return query != null && query.contains(username);
+    }
+    return false;
   }
 
   private boolean isUserFileRequest(HttpExchange.Request request, String username) {

@@ -137,11 +137,19 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
               .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
               .compact();
       Cookie cookie = new Cookie("access_token", token);
+      // The access token is the credential for this lesson's API. Script running in the page has
+      // no reason to read it, and it should not travel over a plaintext connection.
+      cookie.setHttpOnly(true);
+      cookie.setSecure(true);
+      cookie.setPath("/WebGoat");
       response.addCookie(cookie);
       response.setStatus(HttpStatus.OK.value());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     } else {
       Cookie cookie = new Cookie("access_token", "");
+      cookie.setHttpOnly(true);
+      cookie.setSecure(true);
+      cookie.setPath("/WebGoat");
       response.addCookie(cookie);
       response.setStatus(HttpStatus.UNAUTHORIZED.value());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);

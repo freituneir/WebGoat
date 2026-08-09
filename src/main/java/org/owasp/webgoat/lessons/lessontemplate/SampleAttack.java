@@ -7,6 +7,8 @@ package org.owasp.webgoat.lessons.lessontemplate;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -24,7 +26,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @AssignmentHints({"lesson-template.hints.1", "lesson-template.hints.2", "lesson-template.hints.3"})
 public class SampleAttack implements AssignmentEndpoint {
-  private static final String secretValue = "secr37Value";
+  /*
+   * A value the assignment checks against is a credential in every sense that matters, and this
+   * one was a literal in the source: anybody with the repository could answer without attacking
+   * anything. It is drawn from SecureRandom when the application starts.
+   */
+  private static final String secretValue = randomSecret();
+
+  private static String randomSecret() {
+    byte[] secret = new byte[24];
+    new SecureRandom().nextBytes(secret);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+  }
 
   private final LessonSession userSessionData;
 

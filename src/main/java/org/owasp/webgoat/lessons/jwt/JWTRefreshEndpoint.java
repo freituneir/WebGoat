@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -92,7 +91,10 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
             .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
             .compact();
     Map<String, Object> tokenJson = new HashMap<>();
-    String refreshToken = RandomStringUtils.randomAlphabetic(20);
+    // A refresh token is a bearer credential: whoever holds it gets a fresh access token. It was
+    // drawn from RandomStringUtils, which is backed by java.util.Random - a linear generator whose
+    // future output follows from a couple of observed values. It comes from a CSPRNG now.
+    String refreshToken = randomRefreshToken();
     validRefreshTokens.put(refreshToken, user);
     tokenJson.put("access_token", token);
     tokenJson.put("refresh_token", refreshToken);
@@ -108,6 +110,12 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
       throw new JwtException("Unexpected signing algorithm");
     }
     return jws;
+  }
+
+  private static String randomRefreshToken() {
+    byte[] token = new byte[24];
+    new SecureRandom().nextBytes(token);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
   }
 
   @PostMapping("/JWT/refresh/checkout")

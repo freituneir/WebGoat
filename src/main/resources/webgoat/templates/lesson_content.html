@@ -5,7 +5,7 @@
 <!-- Model is setup in the class StartLesson -->
 <div id="lessonInstructions"></div>
 
-<div id="message" class="info" th:utext="${message}"></div>
+<div id="message" class="info" th:text="${message}"></div>
 <br/>
 
 <div th:replace="~{lesson:__'lessons/' + ${lesson.package} + '/html/' + ${lesson.id} + '.html'__}"></div>
