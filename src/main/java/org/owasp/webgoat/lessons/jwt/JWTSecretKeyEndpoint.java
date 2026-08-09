@@ -38,9 +38,8 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   };
 
   /**
-   * Key used to mint the throw-away sample token the lesson hands out. It is deliberately weak so
-   * the exercise of cracking a captured token still works, but it carries no authority: nothing on
-   * the server trusts a token signed with it.
+   * Retained so the lesson can still describe the class of key that made this forgeable. It is no
+   * longer used to sign or to verify anything.
    */
   public static final String JWT_SECRET =
       TextCodec.BASE64.encode(SECRETS[new Random().nextInt(SECRETS.length)]);
@@ -75,7 +74,11 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
         .claim("username", "Tom")
         .claim("Email", "tom@webgoat.org")
         .claim("Role", new String[] {"Manager", "Project Administrator"})
-        .signWith(SignatureAlgorithm.HS256, JWT_SECRET)
+        // Signed with the same high-entropy key the server verifies with. The token this hands
+        // out is therefore no longer crackable offline: an HS256 key drawn from a dictionary can
+        // be recovered from any captured token in seconds, which is what let anyone re-sign it
+        // with whatever claims they liked.
+        .signWith(SignatureAlgorithm.HS256, VERIFICATION_SECRET)
         .compact();
   }
 
