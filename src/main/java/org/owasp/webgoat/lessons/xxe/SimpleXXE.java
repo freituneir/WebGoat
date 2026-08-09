@@ -5,9 +5,11 @@
 package org.owasp.webgoat.lessons.xxe;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
+import org.apache.commons.exec.OS;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.owasp.webgoat.container.CurrentUser;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -32,6 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class SimpleXXE implements AssignmentEndpoint {
 
+  private static final String[] DEFAULT_LINUX_DIRECTORIES = {"usr", "etc", "var"};
+  private static final String[] DEFAULT_WINDOWS_DIRECTORIES = {
+    "Windows", "Program Files (x86)", "Program Files", "pagefile.sys"
+  };
+
   private final CommentsCache comments;
 
   public SimpleXXE(CommentsCache comments) {
@@ -44,12 +51,27 @@ public class SimpleXXE implements AssignmentEndpoint {
       @RequestBody String commentStr, @CurrentUser WebGoatUser user) {
     String error = "";
     try {
-      var comment = comments.parseXml(commentStr);
+      var comment = comments.parseXml(commentStr, false);
       comments.addComment(comment, user, false);
+      if (checkSolution(comment)) {
+        return success(this).build();
+      }
     } catch (Exception e) {
       error = ExceptionUtils.getStackTrace(e);
     }
     return failed(this).output(error).build();
+  }
+
+  private boolean checkSolution(Comment comment) {
+    String[] directoriesToCheck =
+        OS.isFamilyMac() || OS.isFamilyUnix()
+            ? DEFAULT_LINUX_DIRECTORIES
+            : DEFAULT_WINDOWS_DIRECTORIES;
+    boolean success = false;
+    for (String directory : directoriesToCheck) {
+      success |= org.apache.commons.lang3.StringUtils.contains(comment.getText(), directory);
+    }
+    return success;
   }
 
   @RequestMapping(
