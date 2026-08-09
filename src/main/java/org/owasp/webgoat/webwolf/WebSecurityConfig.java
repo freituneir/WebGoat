@@ -43,12 +43,12 @@ public class WebSecurityConfig {
               auth.requestMatchers("/css/**", "/webjars/**", "/favicon.ico", "/js/**", "/images/**")
                   .permitAll();
               auth.requestMatchers("/csrf/token").permitAll();
+              // "/files/**" used to be in this list, which made every uploaded file world
+              // readable: anyone who could guess or list a name could fetch another user's
+              // uploads without ever authenticating. Retrieval now requires a session, and
+              // FileServer checks that the path belongs to the user asking for it.
               auth.requestMatchers(
-                      HttpMethod.GET,
-                      "/fileupload/**",
-                      "/files/**",
-                      "/landing/**",
-                      "/PasswordReset/**")
+                      HttpMethod.GET, "/fileupload/**", "/landing/**", "/PasswordReset/**")
                   .permitAll();
               auth.requestMatchers(HttpMethod.POST, "/files", "/mail", "/requests").permitAll();
               auth.anyRequest().authenticated();
