@@ -79,6 +79,13 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
     return jws.getBody();
   }
 
+  /** Accounts allowed to administer the voting. Held here, never read out of a token. */
+  private static final Set<String> ADMINISTRATORS = Set.of();
+
+  private static boolean hasAdminRole(String user) {
+    return user != null && ADMINISTRATORS.contains(user);
+  }
+
   private static boolean isKnownUser(String user) {
     return user != null && KNOWN_USERS.contains(user);
   }
@@ -216,8 +223,11 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
     } else {
       try {
         Claims claims = verifiedClaims(accessToken);
-        boolean isAdmin = Boolean.valueOf(String.valueOf(claims.get("admin")));
-        if (!isAdmin) {
+        // The "admin" claim travels in the token, so it says what the holder of the token wants it
+        // to say - it is an assertion by the caller, not a decision by this server. The role is
+        // looked up here from the account the token identifies. None of the voting accounts is an
+        // administrator, so resetting the tally is refused whatever the token claims.
+        if (!hasAdminRole((String) claims.get("user"))) {
           return failed(this).feedback("jwt-only-admin").build();
         } else {
           votes.values().forEach(vote -> vote.reset());

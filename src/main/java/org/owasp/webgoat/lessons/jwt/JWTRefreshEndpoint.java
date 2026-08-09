@@ -148,25 +148,31 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
-    String user;
-    String refreshToken;
+    String refreshToken = (String) json.get("refresh_token");
+    if (refreshToken == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    // Who is asking is decided by the refresh token, which is state this server issued and holds,
+    // not by the access token the caller presents. The previous code fell back to the claims of an
+    // *expired* token: the signature was valid, but an expiry that is ignored is not an expiry, and
+    // a token recovered later from a log or a proxy went on identifying its bearer for ever.
+    String user = validRefreshTokens.get(refreshToken);
+    if (user == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    // An access token that is sent along still has to verify and belong to the same account.
     try {
-      user = (String) verifiedClaims(token).getBody().get("user");
-      refreshToken = (String) json.get("refresh_token");
-    } catch (ExpiredJwtException e) {
-      user = (String) e.getClaims().get("user");
-      refreshToken = (String) json.get("refresh_token");
+      if (!user.equals(verifiedClaims(token).getBody().get("user"))) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+      }
     } catch (JwtException | IllegalArgumentException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
-    if (user == null || refreshToken == null) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-    } else if (user.equals(validRefreshTokens.get(refreshToken))) {
-      validRefreshTokens.remove(refreshToken);
-      return ok(createNewTokens(user));
-    } else {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-    }
+    // a refresh token is spent once
+    validRefreshTokens.remove(refreshToken);
+    return ok(createNewTokens(user));
   }
 }
