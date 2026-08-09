@@ -4,6 +4,6 @@ CREATE TABLE access_control_users(
   admin boolean
 );
 
-INSERT INTO access_control_users VALUES ('Tom', 'qwertyqwerty1234', false);
-INSERT INTO access_control_users VALUES ('Jerry', 'doesnotreallymatter', true);
-INSERT INTO access_control_users VALUES ('Sylvester', 'testtesttest', false);
+INSERT INTO access_control_users VALUES ('Tom', CAST(UUID() AS VARCHAR(36)), false);
+INSERT INTO access_control_users VALUES ('Jerry', CAST(UUID() AS VARCHAR(36)), true);
+INSERT INTO access_control_users VALUES ('Sylvester', CAST(UUID() AS VARCHAR(36)), false);
