@@ -98,7 +98,16 @@ public class Requests {
       if (separator < 0) {
         continue;
       }
-      String value = URLDecoder.decode(parameter.substring(separator + 1), StandardCharsets.UTF_8);
+      // A malformed escape such as "%zz" makes decode throw. Anyone may reach /landing without
+      // signing in, so an unguarded call here would let a stranger record one bad trace and take
+      // this page down for everybody whose traces sit behind it in the shared queue.
+      String raw = parameter.substring(separator + 1);
+      String value;
+      try {
+        value = URLDecoder.decode(raw, StandardCharsets.UTF_8);
+      } catch (IllegalArgumentException e) {
+        value = raw;
+      }
       if (username.equals(value)) {
         return true;
       }
