@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.passwordreset;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -68,17 +67,20 @@ public class QuestionsAssignment implements AssignmentEndpoint {
       failedAttempts.remove(account);
     }
 
-    // Answering a security question only recovers the account of the user asking for the reset,
-    // knowing the answer of somebody else is never enough to take over their account.
-    boolean ownAccount = username.equalsIgnoreCase(currentUsername);
+    // A favourite colour is one of a handful of plausible values, so the answer to a security
+    // question is never enough to recover an account by itself. Answering correctly for somebody
+    // else's account is precisely the takeover this lesson is about, and answering for the account
+    // you are already signed in as proves nothing. In both cases the answer only gets the reset
+    // link sent to the address the account is registered under, where its owner can act on it.
     String expectedAnswer = ANSWERS.get(account);
-    if (ownAccount
-        && expectedAnswer != null
-        && MessageDigest.isEqual(
-            expectedAnswer.getBytes(StandardCharsets.UTF_8),
-            hash(account, securityQuestion).getBytes(StandardCharsets.UTF_8))) {
+    boolean answerCorrect =
+        expectedAnswer != null
+            && MessageDigest.isEqual(
+                expectedAnswer.getBytes(StandardCharsets.UTF_8),
+                hash(account, securityQuestion).getBytes(StandardCharsets.UTF_8));
+    if (answerCorrect) {
       failedAttempts.remove(account);
-      return success(this).build();
+      return failed(this).feedback("password-questions-reset-link-sent").build();
     }
 
     if (failedAttempts.merge(account, 1, Integer::sum) >= MAX_ATTEMPTS) {
