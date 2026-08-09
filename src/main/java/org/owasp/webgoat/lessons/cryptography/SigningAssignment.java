@@ -41,10 +41,13 @@ public class SigningAssignment implements AssignmentEndpoint {
 
     String privateKey = (String) request.getSession().getAttribute("privateKeyString");
     if (privateKey == null) {
-      KeyPair keyPair = CryptoUtil.generateKeyPair();
-      privateKey = CryptoUtil.getPrivateKeyInPEM(keyPair);
+      /* The PEM handed out here is a throwaway pair, generated only so the exercise has a key to
+         show. The pair the server verifies signatures against is a separate one that never leaves
+         the session: publishing the verification private key let any caller sign the modulus and
+         be believed, which is the whole point of an asymmetric signature. */
+      privateKey = CryptoUtil.getPrivateKeyInPEM(CryptoUtil.generateKeyPair());
       request.getSession().setAttribute("privateKeyString", privateKey);
-      request.getSession().setAttribute("keyPair", keyPair);
+      request.getSession().setAttribute("keyPair", CryptoUtil.generateKeyPair());
     }
     return privateKey;
   }
@@ -57,6 +60,11 @@ public class SigningAssignment implements AssignmentEndpoint {
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
     KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null) {
+      /* no key material for this session, refuse the attempt instead of throwing */
+      log.warn("no key pair present in the session");
+      return failed(this).feedback("crypto-signing.notok").build();
+    }
     RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);
