@@ -5,7 +5,7 @@
 package org.owasp.webgoat.lessons.passwordreset;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -70,7 +70,9 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
       }
     }
 
-    return success(this).feedback("email.send").feedbackArgs(email).build();
+    // Sending somebody a reset link is a reset request, not a finding: this reported the
+    // assignment solved for any send at all, whether or not the defect was ever exercised.
+    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
   }
 
   private void sendMailToUser(String email, String host, String resetLink) {
