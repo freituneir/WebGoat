@@ -71,7 +71,16 @@ public class WebSecurityConfig {
                 csrf.csrfTokenRepository(csrfTokenRepository)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                     .ignoringRequestMatchers(
-                        CsrfExemptions.headerlessAuthentication("/login", "/register.mvc")))
+                        CsrfExemptions.headerlessAuthentication(
+                            "/login",
+                            "/register.mvc",
+                            // Only place a message in the mailbox; they grant nothing themselves.
+                            "/PasswordReset/ForgotPassword/create-password-reset-link",
+                            "/WebWolf/mail/send",
+                            // Redeeming a reset is guarded by the token's owner and single-use
+                            // checks, which is where that decision belongs.
+                            "/PasswordReset/reset/change-password",
+                            "/PasswordReset/reset/login")))
         .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
         .exceptionHandling(
             handling ->

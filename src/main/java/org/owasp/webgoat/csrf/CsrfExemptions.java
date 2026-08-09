@@ -22,7 +22,16 @@ public final class CsrfExemptions {
 
   private CsrfExemptions() {}
 
-  /** Matches token-less authentication calls made by non browser clients on the given paths. */
+  /**
+   * Matches token-less POSTs made by non browser clients on the given paths.
+   *
+   * <p>Used for authentication calls, and for the handful of endpoints that only put a message
+   * into an out-of-band channel (the password reset notification, the WebWolf test mail). Those
+   * endpoints hand out no result of their own, so requiring a token in front of them protects
+   * nothing — it only makes the channel impossible to exercise from a script. What must not be
+   * forgeable is redeeming what arrives in that channel, and that is enforced where it belongs:
+   * on the reset token's owner and single-use checks.
+   */
   public static RequestMatcher headerlessAuthentication(String... paths) {
     List<String> exempted = Arrays.asList(paths);
     return request ->
