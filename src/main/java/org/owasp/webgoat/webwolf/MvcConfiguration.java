@@ -45,6 +45,9 @@ public class MvcConfiguration implements WebMvcConfigurer {
   @Override
   public void addInterceptors(InterceptorRegistry registry) {
     registry.addInterceptor(new UserInterceptor());
+    // The resource handler above serves everything beneath the upload root, so ownership has to
+    // be enforced in front of it rather than inside FileServer, which it never reaches.
+    registry.addInterceptor(new UploadOwnershipInterceptor()).addPathPatterns("/files/**");
   }
 
   @PostConstruct
