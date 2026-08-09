@@ -28,7 +28,7 @@ public class LessonConnectionInvocationHandler implements InvocationHandler {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication != null && authentication.getPrincipal() instanceof WebGoatUser user) {
       try (var statement = targetConnection.createStatement()) {
-        statement.execute("SET SCHEMA \"" + user.getUsername() + "\"");
+        statement.execute("SET SCHEMA " + quotedSchema(user.getUsername()));
       }
     }
     try {
@@ -36,5 +36,15 @@ public class LessonConnectionInvocationHandler implements InvocationHandler {
     } catch (InvocationTargetException e) {
       throw e.getTargetException();
     }
+  }
+
+  /**
+   * A schema name cannot be bound as a parameter, so it is quoted here instead. The name comes from
+   * the account, and an account name is chosen by whoever registers it: one containing a double
+   * quote used to end the identifier early and let the rest of the name run on as SQL of its own.
+   * Doubling the quotes keeps the whole name inside the identifier, whatever it contains.
+   */
+  private String quotedSchema(String username) {
+    return "\"" + username.replace("\"", "\"\"") + "\"";
   }
 }

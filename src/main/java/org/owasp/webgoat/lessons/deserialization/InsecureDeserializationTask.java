@@ -10,7 +10,9 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InvalidClassException;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
+import java.io.ObjectStreamClass;
 import java.util.Base64;
 import org.dummy.insecure.framework.VulnerableTaskHolder;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -29,6 +31,25 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class InsecureDeserializationTask implements AssignmentEndpoint {
 
+  /*
+   * A hostile stream never gets to name a class. Only primitives and strings are let through,
+   * anything else is refused before an instance exists, so no gadget's readObject() ever runs.
+   */
+  private static final ObjectInputFilter DATA_ONLY_FILTER =
+      info -> {
+        Class<?> clazz = info.serialClass();
+        if (clazz == null) {
+          return ObjectInputFilter.Status.UNDECIDED;
+        }
+        while (clazz.isArray()) {
+          clazz = clazz.getComponentType();
+        }
+        if (clazz.isPrimitive() || String.class.equals(clazz)) {
+          return ObjectInputFilter.Status.ALLOWED;
+        }
+        return ObjectInputFilter.Status.REJECTED;
+      };
+
   @PostMapping("/InsecureDeserialization/task")
   @ResponseBody
   public AttackResult completed(@RequestParam String token) throws IOException {
@@ -39,8 +60,7 @@ public class InsecureDeserializationTask implements AssignmentEndpoint {
 
     b64token = token.replace('-', '+').replace('_', '/');
 
-    try (ObjectInputStream ois =
-        new ObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(b64token)))) {
+    try (ObjectInputStream ois = new GuardedObjectInputStream(b64token)) {
       before = System.currentTimeMillis();
       Object o = ois.readObject();
       if (!(o instanceof VulnerableTaskHolder)) {
@@ -66,5 +86,28 @@ public class InsecureDeserializationTask implements AssignmentEndpoint {
       return failed(this).build();
     }
     return success(this).build();
+  }
+
+  /*
+   * Belt and braces: the stream itself declines to resolve any class or proxy, so the guard does
+   * not rest on the filter alone. A plain string carries no class descriptor and still reads back,
+   * which keeps this assignment's feedback working.
+   */
+  private static final class GuardedObjectInputStream extends ObjectInputStream {
+
+    private GuardedObjectInputStream(String b64token) throws IOException {
+      super(new ByteArrayInputStream(Base64.getDecoder().decode(b64token)));
+      setObjectInputFilter(DATA_ONLY_FILTER);
+    }
+
+    @Override
+    protected Class<?> resolveClass(ObjectStreamClass desc) throws InvalidClassException {
+      throw new InvalidClassException(desc.getName(), "class is not accepted");
+    }
+
+    @Override
+    protected Class<?> resolveProxyClass(String[] interfaces) throws InvalidClassException {
+      throw new InvalidClassException("proxies are not accepted");
+    }
   }
 }
