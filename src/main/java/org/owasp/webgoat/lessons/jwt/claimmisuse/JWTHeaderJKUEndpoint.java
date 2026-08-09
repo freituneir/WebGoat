@@ -7,14 +7,11 @@ package org.owasp.webgoat.lessons.jwt.claimmisuse;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import com.auth0.jwk.JwkException;
-import com.auth0.jwk.JwkProviderBuilder;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.security.interfaces.RSAPublicKey;
+import java.security.SecureRandom;
+import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -37,6 +34,16 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
 
+  // Verification uses a key this server holds. The 'jku' header points wherever the sender
+  // wants it to, so it is never followed to fetch the key the token is checked against.
+  private static final Algorithm SIGNING_ALGORITHM = Algorithm.HMAC256(randomKey());
+
+  private static String randomKey() {
+    byte[] key = new byte[32];
+    new SecureRandom().nextBytes(key);
+    return Base64.getEncoder().encodeToString(key);
+  }
+
   @PostMapping("jku/follow/{user}")
   public @ResponseBody String follow(@PathVariable("user") String user) {
     if ("Jerry".equals(user)) {
@@ -52,14 +59,9 @@ public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
       return failed(this).feedback("jwt-invalid-token").build();
     } else {
       try {
-        var decodedJWT = JWT.decode(token);
-        var jku = decodedJWT.getHeaderClaim("jku");
-        var jwkProvider = new JwkProviderBuilder(new URL(jku.asString())).build();
-        var jwk = jwkProvider.get(decodedJWT.getKeyId());
-        var algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey());
-        JWT.require(algorithm).build().verify(decodedJWT);
+        var decodedJWT = JWT.require(SIGNING_ALGORITHM).build().verify(token);
 
-        var username = decodedJWT.getClaims().get("username").asString();
+        var username = decodedJWT.getClaim("username").asString();
         if ("Jerry".equals(username)) {
           return failed(this).feedback("jwt-final-jerry-account").build();
         }
@@ -68,7 +70,7 @@ public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
         } else {
           return failed(this).feedback("jwt-final-not-tom").build();
         }
-      } catch (MalformedURLException | JWTVerificationException | JwkException e) {
+      } catch (JWTVerificationException | IllegalArgumentException e) {
         return failed(this).feedback("jwt-invalid-token").output(e.toString()).build();
       }
     }
