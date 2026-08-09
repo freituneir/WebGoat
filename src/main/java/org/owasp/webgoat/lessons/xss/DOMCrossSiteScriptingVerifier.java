@@ -40,7 +40,7 @@ public class DOMCrossSiteScriptingVerifier implements AssignmentEndpoint {
   public AttackResult completed(@RequestParam String successMessage) {
     String answer = (String) lessonSession.getValue("randValue");
 
-    if (answer != null && successMessage.equals(answer)) {
+    if (successMessage.equals(answer)) {
       return success(this).feedback("xss-dom-message-success").build();
     } else {
       return failed(this).feedback("xss-dom-message-failure").build();

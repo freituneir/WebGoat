@@ -8,7 +8,6 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.io.IOException;
-import jakarta.servlet.http.HttpSession;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,14 +22,7 @@ public class CrossSiteScriptingQuiz implements AssignmentEndpoint {
   private static final String[] solutions = {
     "Solution 4", "Solution 3", "Solution 1", "Solution 2", "Solution 4"
   };
-
-  /*
-   * The per-question outcome used to live in a field on this controller. A controller is a
-   * singleton, so that single array was shared by everybody: whatever the last person to submit
-   * scored was handed to the next caller of the GET below, and anyone could read it without
-   * answering anything at all. The outcome now belongs to the session that produced it.
-   */
-  private static final String RESULTS_KEY = "xss-quiz-results";
+  boolean[] guesses = new boolean[solutions.length];
 
   @PostMapping("/CrossSiteScripting/quiz")
   @ResponseBody
@@ -39,10 +31,9 @@ public class CrossSiteScriptingQuiz implements AssignmentEndpoint {
       @RequestParam String[] question_1_solution,
       @RequestParam String[] question_2_solution,
       @RequestParam String[] question_3_solution,
-      @RequestParam String[] question_4_solution, HttpSession session)
+      @RequestParam String[] question_4_solution)
       throws IOException {
     int correctAnswers = 0;
-    boolean[] guesses = new boolean[solutions.length];
 
     String[] givenAnswers = {
       question_0_solution[0],
@@ -63,8 +54,6 @@ public class CrossSiteScriptingQuiz implements AssignmentEndpoint {
       }
     }
 
-    session.setAttribute(RESULTS_KEY, guesses);
-
     if (correctAnswers == solutions.length) {
       return success(this).build();
     } else {
@@ -74,8 +63,7 @@ public class CrossSiteScriptingQuiz implements AssignmentEndpoint {
 
   @GetMapping("/CrossSiteScripting/quiz")
   @ResponseBody
-  public boolean[] getResults(HttpSession session) {
-    var results = (boolean[]) session.getAttribute(RESULTS_KEY);
-    return results == null ? new boolean[solutions.length] : results.clone();
+  public boolean[] getResults() {
+    return this.guesses;
   }
 }
