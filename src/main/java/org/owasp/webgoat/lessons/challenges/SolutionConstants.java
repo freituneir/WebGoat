@@ -6,6 +6,9 @@ package org.owasp.webgoat.lessons.challenges;
 
 public interface SolutionConstants {
 
-  // TODO should be random generated when starting the server
-  String PASSWORD = "!!webgoat_admin_1234!!";
+  // A credential written into the source is public: it sits in the repository, in every build
+  // and in every container image. The unguessable part is drawn at boot instead. The "1234"
+  // placeholder stays where it is, the challenge still substitutes its pincode there.
+  String PASSWORD =
+      "!!webgoat_admin_" + java.util.UUID.randomUUID().toString().replace("-", "") + "_1234!!";
 }
