@@ -44,13 +44,16 @@ public class UserProfile {
     }
   }
 
+  /**
+   * The view of a profile that may be handed to a client. The internal id and the role are left
+   * out on purpose: the id is what turns a profile into a guessable direct object reference, and
+   * the role is what authorization decisions are made on.
+   */
   public Map<String, Object> profileToMap() {
     Map<String, Object> profileMap = new HashMap<>();
-    profileMap.put("userId", this.userId);
     profileMap.put("name", this.name);
     profileMap.put("color", this.color);
     profileMap.put("size", this.size);
-    profileMap.put("role", this.role);
     return profileMap;
   }
 

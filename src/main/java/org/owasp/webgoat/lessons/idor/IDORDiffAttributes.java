@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.idor;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -31,13 +30,8 @@ public class IDORDiffAttributes implements AssignmentEndpoint {
     if (diffAttribs.length < 2) {
       return failed(this).feedback("idor.diff.attributes.missing").build();
     }
-    if (diffAttribs[0].toLowerCase().trim().equals("userid")
-            && diffAttribs[1].toLowerCase().trim().equals("role")
-        || diffAttribs[1].toLowerCase().trim().equals("userid")
-            && diffAttribs[0].toLowerCase().trim().equals("role")) {
-      return success(this).feedback("idor.diff.success").build();
-    } else {
-      return failed(this).feedback("idor.diff.failure").build();
-    }
+    // The profile handed to the client no longer carries anything the page keeps hidden: the
+    // internal id and the role never leave this side, so there is nothing left to name here.
+    return failed(this).feedback("idor.diff.no.hidden.attributes").build();
   }
 }
