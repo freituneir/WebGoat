@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
 import static java.sql.ResultSet.CONCUR_UPDATABLE;
-import static java.sql.ResultSet.TYPE_SCROLL_SENSITIVE;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
@@ -134,12 +133,14 @@ public class SqlInjectionLesson8 implements AssignmentEndpoint {
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     String time = sdf.format(cal.getTime());
 
-    String logQuery =
-        "INSERT INTO access_log (time, action) VALUES ('" + time + "', '" + action + "')";
+    // The audit trail itself was built by concatenation, so anything the caller managed to get
+    // logged was executed a second time here. Both values are bound instead.
+    String logQuery = "INSERT INTO access_log (time, action) VALUES (?, ?)";
 
-    try {
-      Statement statement = connection.createStatement(TYPE_SCROLL_SENSITIVE, CONCUR_UPDATABLE);
-      statement.executeUpdate(logQuery);
+    try (PreparedStatement logStatement = connection.prepareStatement(logQuery)) {
+      logStatement.setString(1, time);
+      logStatement.setString(2, action);
+      logStatement.executeUpdate();
     } catch (SQLException e) {
       System.err.println(e.getMessage());
     }

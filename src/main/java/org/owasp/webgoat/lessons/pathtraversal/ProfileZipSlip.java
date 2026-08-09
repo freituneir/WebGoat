@@ -20,6 +20,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FilenameUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -69,14 +70,21 @@ public class ProfileZipSlip extends ProfileUploadBase {
     var currentImage = getProfilePictureAsBase64(username);
 
     try {
-      var uploadedZipFile = tmpZipDirectory.resolve(file.getOriginalFilename());
+      // the client supplied name may not steer the archive out of the temporary directory
+      var zipFileName = FilenameUtils.getName(file.getOriginalFilename());
+      var uploadedZipFile = tmpZipDirectory.resolve(zipFileName);
       FileCopyUtils.copy(file.getBytes(), uploadedZipFile.toFile());
 
+      var targetDirectory = tmpZipDirectory.toFile().getCanonicalFile();
       ZipFile zip = new ZipFile(uploadedZipFile.toFile());
       Enumeration<? extends ZipEntry> entries = zip.entries();
       while (entries.hasMoreElements()) {
         ZipEntry e = entries.nextElement();
-        File f = new File(tmpZipDirectory.toFile(), e.getName());
+        File f = new File(targetDirectory, e.getName()).getCanonicalFile();
+        // zip slip: an entry may never resolve outside the directory it is unpacked into
+        if (!f.toPath().startsWith(targetDirectory.toPath())) {
+          return failed(this).output("path-traversal-zip-slip.extracted").build();
+        }
         InputStream is = zip.getInputStream(e);
         Files.copy(is, f.toPath(), StandardCopyOption.REPLACE_EXISTING);
       }

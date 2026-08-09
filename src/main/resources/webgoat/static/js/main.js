@@ -69,5 +69,17 @@ require([
 	'backbone',
 	'bootstrap',
 	'goatApp/goatApp'], function($,jqueryVuln,jqueryui,_,Backbone,Bootstrap,Goat){
+    // Every state changing call now has to carry the CSRF token the server handed out as a
+    // cookie. Safe methods do not need one, and a call to another origin must never see it.
+    $.ajaxPrefilter(function (options, originalOptions, xhr) {
+        var method = (options.type || options.method || 'GET').toUpperCase();
+        if (options.crossDomain || /^(GET|HEAD|OPTIONS|TRACE)$/.test(method)) {
+            return;
+        }
+        var cookie = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+        if (cookie) {
+            xhr.setRequestHeader('X-XSRF-TOKEN', decodeURIComponent(cookie[1]));
+        }
+    });
     Goat.initApp();
 });

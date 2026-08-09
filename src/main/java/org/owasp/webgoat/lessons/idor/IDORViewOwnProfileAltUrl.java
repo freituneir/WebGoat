@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.idor;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -32,30 +31,18 @@ public class IDORViewOwnProfileAltUrl implements AssignmentEndpoint {
   @PostMapping("/IDOR/profile/alt-path")
   @ResponseBody
   public AttackResult completed(@RequestParam String url) {
-    try {
-      if (userSessionData.getValue("idor-authenticated-as").equals("tom")) {
-        // going to use session auth to view this one
-        String authUserId = (String) userSessionData.getValue("idor-authenticated-user-id");
-        // don't care about http://localhost:8080 ... just want WebGoat/
-        String[] urlParts = url.split("/");
-        if (urlParts[0].equals("WebGoat")
-            && urlParts[1].equals("IDOR")
-            && urlParts[2].equals("profile")
-            && urlParts[3].equals(authUserId)) {
-          UserProfile userProfile = new UserProfile(authUserId);
-          return success(this)
-              .feedback("idor.view.own.profile.success")
-              .output(userProfile.profileToMap().toString())
-              .build();
-        } else {
-          return failed(this).feedback("idor.view.own.profile.failure1").build();
-        }
-
-      } else {
-        return failed(this).feedback("idor.view.own.profile.failure2").build();
-      }
-    } catch (Exception ex) {
-      return failed(this).output("an error occurred with your request").build();
+    String authUserId = (String) userSessionData.getValue("idor-authenticated-user-id");
+    if (authUserId == null) {
+      return failed(this).feedback("idor.view.own.profile.failure2").build();
     }
+
+    // The profile comes from the session, not from the path the client typed. That path is
+    // deliberately not compared with the internal id: doing so would make this endpoint an oracle
+    // that confirms guessed object references.
+    UserProfile userProfile = new UserProfile(authUserId);
+    return failed(this)
+        .feedback("idor.view.own.profile.direct")
+        .output(userProfile.profileToMap().toString())
+        .build();
   }
 }

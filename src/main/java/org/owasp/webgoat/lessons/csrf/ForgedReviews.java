@@ -5,11 +5,12 @@
 package org.owasp.webgoat.lessons.csrf;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.http.MediaType.ALL_VALUE;
 
 import com.google.common.collect.Lists;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -17,10 +18,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
+import org.owasp.webgoat.container.session.LessonSession;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,7 +38,13 @@ public class ForgedReviews implements AssignmentEndpoint {
 
   private static final Map<String, List<Review>> userReviews = new HashMap<>();
   private static final List<Review> REVIEWS = new ArrayList<>();
-  private static final String weakAntiCSRF = "2aa14227b9a13d0bede0388a7fba9aa9";
+  private static final String CSRF_TOKEN_KEY = "csrf-review-token";
+
+  private final LessonSession userSessionData;
+
+  public ForgedReviews(LessonSession userSessionData) {
+    this.userSessionData = userSessionData;
+  }
 
   static {
     REVIEWS.add(
@@ -67,6 +76,16 @@ public class ForgedReviews implements AssignmentEndpoint {
     return allReviews;
   }
 
+  /**
+   * Hands the review form its anti-CSRF token. The token belongs to one session and the same
+   * origin policy keeps another site from reading this response.
+   */
+  @GetMapping(path = "/csrf/review/token", produces = MediaType.APPLICATION_JSON_VALUE)
+  @ResponseBody
+  public Map<String, String> csrfToken() {
+    return Map.of("token", tokenForSession());
+  }
+
   @PostMapping("/csrf/review")
   @ResponseBody
   public AttackResult createNewReview(
@@ -75,10 +94,16 @@ public class ForgedReviews implements AssignmentEndpoint {
       String validateReq,
       HttpServletRequest request,
       @CurrentUsername String username) {
-    final String host = (request.getHeader("host") == null) ? "NULL" : request.getHeader("host");
-    final String referer =
-        (request.getHeader("referer") == null) ? "NULL" : request.getHeader("referer");
-    final String[] refererArr = referer.split("/");
+    // stored only if the post started on the review page...
+    if (!OriginCheck.fromThisApplication(request)) {
+      return failed(this).feedback("csrf-request-rejected").build();
+    }
+    // ...and carries the token that belongs to this session. It used to be one fixed string
+    // for every user, which an attacker could simply copy into their own form.
+    Object expectedToken = userSessionData.getValue(CSRF_TOKEN_KEY);
+    if (expectedToken == null || validateReq == null || !tokensMatch(validateReq, expectedToken)) {
+      return failed(this).feedback("csrf-you-forgot-something").build();
+    }
 
     Review review = new Review();
     review.setText(reviewText);
@@ -88,17 +113,22 @@ public class ForgedReviews implements AssignmentEndpoint {
     var reviews = userReviews.getOrDefault(username, new ArrayList<>());
     reviews.add(review);
     userReviews.put(username, reviews);
-    // short-circuit
-    if (validateReq == null || !validateReq.equals(weakAntiCSRF)) {
-      return failed(this).feedback("csrf-you-forgot-something").build();
+
+    return failed(this).feedback("csrf-same-host").build();
+  }
+
+  private String tokenForSession() {
+    Object token = userSessionData.getValue(CSRF_TOKEN_KEY);
+    if (token == null) {
+      token = UUID.randomUUID().toString();
+      userSessionData.setValue(CSRF_TOKEN_KEY, token);
     }
-    // we have the spoofed files
-    if (referer != "NULL" && refererArr[2].equals(host)) {
-      return failed(this).feedback("csrf-same-host").build();
-    } else {
-      return success(this)
-          .feedback("csrf-review.success")
-          .build(); // feedback("xss-stored-comment-failure")
-    }
+    return token.toString();
+  }
+
+  private boolean tokensMatch(String provided, Object expected) {
+    return MessageDigest.isEqual(
+        provided.getBytes(StandardCharsets.UTF_8),
+        expected.toString().getBytes(StandardCharsets.UTF_8));
   }
 }

@@ -7,6 +7,7 @@ package org.owasp.webgoat.lessons.missingac;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -23,16 +24,30 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class MissingFunctionACHiddenMenus implements AssignmentEndpoint {
 
+  private final MissingAccessControlUserRepository userRepository;
+
+  public MissingFunctionACHiddenMenus(MissingAccessControlUserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
+
   @PostMapping(
       path = "/access-control/hidden-menu",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(String hiddenMenu1, String hiddenMenu2) {
-    if (hiddenMenu1.equals("Users") && hiddenMenu2.equals("Config")) {
+  public AttackResult completed(
+      String hiddenMenu1, String hiddenMenu2, @CurrentUsername String username) {
+    // the admin entries are not rendered into the page any more, and the role behind this check
+    // is looked up from the authenticated user rather than taken from the request
+    var currentUser = userRepository.findByUsername(username);
+    if (currentUser == null || !currentUser.isAdmin()) {
+      return failed(this).feedback("access-control.hidden-menus.failure").output("").build();
+    }
+
+    if ("Users".equals(hiddenMenu1) && "Config".equals(hiddenMenu2)) {
       return success(this).output("").feedback("access-control.hidden-menus.success").build();
     }
 
-    if (hiddenMenu1.equals("Config") && hiddenMenu2.equals("Users")) {
+    if ("Config".equals(hiddenMenu1) && "Users".equals(hiddenMenu2)) {
       return failed(this).output("").feedback("access-control.hidden-menus.close").build();
     }
 

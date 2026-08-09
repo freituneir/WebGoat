@@ -8,7 +8,6 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -29,11 +28,15 @@ public class MailAssignment implements AssignmentEndpoint {
 
   private final String webWolfURL;
   private RestTemplate restTemplate;
+  private final UniqueCodeRegistry uniqueCodes;
 
   public MailAssignment(
-      RestTemplate restTemplate, @Value("${webwolf.mail.url}") String webWolfURL) {
+      RestTemplate restTemplate,
+      @Value("${webwolf.mail.url}") String webWolfURL,
+      UniqueCodeRegistry uniqueCodes) {
     this.restTemplate = restTemplate;
     this.webWolfURL = webWolfURL;
+    this.uniqueCodes = uniqueCodes;
   }
 
   @PostMapping("/WebWolf/mail/send")
@@ -48,7 +51,7 @@ public class MailAssignment implements AssignmentEndpoint {
               .title("Test messages from WebWolf")
               .contents(
                   "This is a test message from WebWolf, your unique code is: "
-                      + StringUtils.reverse(username))
+                      + uniqueCodes.codeFor(webGoatUsername, UniqueCodeRegistry.MAIL))
               .sender("webgoat@owasp.org")
               .build();
       try {
@@ -71,7 +74,7 @@ public class MailAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/mail")
   @ResponseBody
   public AttackResult completed(@RequestParam String uniqueCode, @CurrentUsername String username) {
-    if (uniqueCode.equals(StringUtils.reverse(username))) {
+    if (uniqueCodes.isValid(username, UniqueCodeRegistry.MAIL, uniqueCode)) {
       return success(this).build();
     } else {
       return failed(this).feedbackArgs("webwolf.code_incorrect").feedbackArgs(uniqueCode).build();

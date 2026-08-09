@@ -8,6 +8,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.owasp.webgoat.lessons.missingac.MissingFunctionAC.PASSWORD_SALT_SIMPLE;
 
+import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -35,10 +36,19 @@ public class MissingFunctionACYourHash implements AssignmentEndpoint {
       path = "/access-control/user-hash",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult simple(String userHash) {
+  public AttackResult simple(String userHash, @CurrentUsername String username) {
+    // another account's hash is administrative data; the role comes from the authenticated
+    // user, never from anything in the request
+    var currentUser = userRepository.findByUsername(username);
+    if (currentUser == null || !currentUser.isAdmin()) {
+      return failed(this).build();
+    }
     User user = userRepository.findByUsername("Jerry");
+    if (user == null) {
+      return failed(this).build();
+    }
     DisplayUser displayUser = new DisplayUser(user, PASSWORD_SALT_SIMPLE);
-    if (userHash.equals(displayUser.getUserHash())) {
+    if (displayUser.getUserHash().equals(userHash)) {
       return success(this).feedback("access-control.hash.success").build();
     } else {
       return failed(this).build();

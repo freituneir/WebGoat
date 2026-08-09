@@ -60,7 +60,7 @@ public class Requests {
     HttpExchange.Request req = t.getRequest();
     boolean allowed = true;
     /* do not show certain traces to other users in a classroom setup */
-    if (req.getUri().getPath().contains("/files") && !req.getUri().getPath().contains(username)) {
+    if (req.getUri().getPath().contains("/files") && !isUserFileRequest(req, username)) {
       allowed = false;
     } else if (req.getUri().getPath().contains("/landing")
         && req.getUri().getQuery() != null
@@ -70,6 +70,16 @@ public class Requests {
     }
 
     return allowed;
+  }
+
+  private boolean isUserFileRequest(HttpExchange.Request request, String username) {
+    String[] pathSegments = request.getUri().getPath().split("/");
+    for (int index = 0; index < pathSegments.length - 1; index++) {
+      if ("files".equals(pathSegments[index])) {
+        return username.equals(pathSegments[index + 1]);
+      }
+    }
+    return false;
   }
 
   private String path(HttpExchange t) {
