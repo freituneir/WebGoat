@@ -75,6 +75,20 @@ public class UserService implements UserDetailsService {
     return webGoatUser;
   }
 
+  /**
+   * Registers an account only when there is not one under that name already.
+   *
+   * <p>{@link #addUser(String, String)} saves unconditionally, so calling it for somebody who has
+   * already registered replaces their stored password. That is the right behaviour for the
+   * registration form, where the caller has just chosen the password, and the wrong behaviour
+   * anywhere the name comes from somewhere other than the person typing it.
+   */
+  public void addUserIfAbsent(String username, String password) {
+    if (!userRepository.existsByUsername(username)) {
+      addUser(username, password);
+    }
+  }
+
   public void addUser(String username, String password) {
     // get user if there exists one by the name
     var userAlreadyExists = userRepository.existsByUsername(username);
