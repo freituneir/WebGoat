@@ -6,6 +6,8 @@ package org.owasp.webgoat.webwolf.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -73,7 +75,33 @@ public class Requests {
       return isUserFileRequest(req, username);
     }
     if (path.contains("/landing")) {
-      return query != null && query.contains(username);
+      return isUserLandingRequest(query, username);
+    }
+    return false;
+  }
+
+  /**
+   * A landing request belongs to the user whose name one of its parameters actually is.
+   *
+   * <p>Testing the raw query string for the name as a substring is not that test. The name is
+   * chosen by whoever registers, so a short one is a substring of nearly every query and matches
+   * everybody else's traces, which carry the codes and links these lessons hand out. It also
+   * matches when the name merely appears inside some unrelated value. Each parameter is decoded
+   * and compared on its own instead.
+   */
+  private boolean isUserLandingRequest(String query, String username) {
+    if (query == null || username == null || username.isEmpty()) {
+      return false;
+    }
+    for (String parameter : query.split("&")) {
+      int separator = parameter.indexOf('=');
+      if (separator < 0) {
+        continue;
+      }
+      String value = URLDecoder.decode(parameter.substring(separator + 1), StandardCharsets.UTF_8);
+      if (username.equals(value)) {
+        return true;
+      }
     }
     return false;
   }
