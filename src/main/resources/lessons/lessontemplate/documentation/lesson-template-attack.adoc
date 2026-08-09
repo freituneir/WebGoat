@@ -9,7 +9,7 @@ import org.owasp.webgoat.container.assignments.AssignmentEndpoint;@RestControlle
 @AssignmentHints({"lesson-template.hints.1", "lesson-template.hints.2", "lesson-template.hints.3"}) // <2>
 public class SampleAttack implements AssignmentEndpoint { // <3>
 
-    private final String secretValue = "secr37Value";
+    private final String secretValue = "the value the server generated for this run";
 
     @Autowired
     private UserSessionData userSessionData; // <4>
