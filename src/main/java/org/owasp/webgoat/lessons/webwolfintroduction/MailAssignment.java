@@ -85,7 +85,9 @@ public class MailAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/mail")
   @ResponseBody
   public AttackResult completed(@RequestParam String uniqueCode, @CurrentUsername String username) {
-    String mailedCode = mailedCodes.get(username);
+    // One shot: the mailed code is consumed by the first attempt, so it cannot be replayed and
+    // cannot be brute-forced over repeated submissions.
+    String mailedCode = mailedCodes.remove(username);
     if (mailedCode != null && uniqueCode != null && constantTimeEquals(mailedCode, uniqueCode)) {
       return success(this).build();
     } else {

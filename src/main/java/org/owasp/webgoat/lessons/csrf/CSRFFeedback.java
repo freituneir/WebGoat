@@ -57,8 +57,9 @@ public class CSRFFeedback implements AssignmentEndpoint {
     } catch (IOException e) {
       return failed(this).feedback(ExceptionUtils.getStackTrace(e)).build();
     }
-    // The feedback is only accepted when it carries the anti-CSRF token of this session.
-    if (!CsrfProtection.hasValidToken(request)) {
+    // The feedback is only accepted when it carries the anti-CSRF token of this session and comes
+    // from this application's own origin. A missing Origin/Referer proves nothing and is refused.
+    if (!CsrfProtection.hasValidToken(request) || !CsrfProtection.isSameOrigin(request)) {
       return failed(this)
           .output("Missing or invalid anti-CSRF token, the feedback was not accepted.")
           .build();

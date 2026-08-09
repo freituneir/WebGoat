@@ -73,9 +73,11 @@ public class ForgedReviews implements AssignmentEndpoint {
       Integer stars,
       HttpServletRequest request,
       @CurrentUsername String username) {
-    // The review form carries the unpredictable token of this session in "validateReq"; a forged
-    // request cannot know it, so it is rejected before anything is stored.
-    if (!CsrfProtection.hasValidToken(request)) {
+    // Two independent checks, both made before anything is stored: the review form carries the
+    // unpredictable token of this session in "validateReq", which a forged request cannot know,
+    // and the request has to state an Origin/Referer belonging to this application. A request
+    // that fails either of them is not a review this user asked to post.
+    if (!CsrfProtection.hasValidToken(request) || !CsrfProtection.isSameOrigin(request)) {
       return failed(this).feedback("csrf-you-forgot-something").build();
     }
 

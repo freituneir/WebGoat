@@ -49,7 +49,9 @@ public class LandingAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/landing")
   @ResponseBody
   public AttackResult click(String uniqueCode, @CurrentUsername String username) {
-    String issuedCode = issuedCodes.get(username);
+    // The code is consumed on the first attempt, whether or not it was the right one: a callback
+    // code is a one-shot credential, so it can neither be replayed nor guessed at over many tries.
+    String issuedCode = issuedCodes.remove(username);
     if (issuedCode != null && uniqueCode != null && constantTimeEquals(issuedCode, uniqueCode)) {
       return success(this).build();
     }

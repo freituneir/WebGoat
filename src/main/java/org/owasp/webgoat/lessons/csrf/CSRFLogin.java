@@ -25,9 +25,9 @@ public class CSRFLogin implements AssignmentEndpoint {
       produces = {"application/json"})
   @ResponseBody
   public AttackResult completed(HttpServletRequest request, @CurrentUsername String username) {
-    // Without the anti-CSRF token of this session the request is not proven to be sent by the user
-    // himself, so it is not acted upon.
-    if (!CsrfProtection.hasValidToken(request)) {
+    // Without the anti-CSRF token of this session, and an Origin/Referer belonging to this
+    // application, the request is not proven to have been sent by the user, so it is not acted on.
+    if (!CsrfProtection.hasValidToken(request) || !CsrfProtection.isSameOrigin(request)) {
       return failed(this).feedback("csrf-you-forgot-something").build();
     }
     if (username.startsWith("csrf")) {
