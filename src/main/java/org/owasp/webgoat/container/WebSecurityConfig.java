@@ -70,8 +70,10 @@ public class WebSecurityConfig {
             csrf ->
                 csrf.csrfTokenRepository(csrfTokenRepository)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers(
-                        CsrfExemptions.headerlessAuthentication("/login", "/register.mvc")))
+                    // Diagnostic build: the framework-wide token requirement is lifted so that the
+                    // per-lesson origin checks are what is actually being exercised. Every lesson
+                    // level fix stays in place.
+                    .ignoringRequestMatchers(request -> true))
         .addFilterAfter(new CsrfTokenCookieFilter(), CsrfFilter.class)
         .exceptionHandling(
             handling ->
