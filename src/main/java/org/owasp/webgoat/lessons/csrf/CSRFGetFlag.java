@@ -41,11 +41,13 @@ public class CSRFGetFlag {
       return response;
     }
 
-    Random random = new Random();
-    userSessionData.setValue("csrf-get-success", random.nextInt(65536));
-    response.put("success", true);
-    response.put("message", pluginMessages.getMessage("csrf-get-null-referer.success"));
-    response.put("flag", userSessionData.getValue("csrf-get-success"));
+    // The request proved it came from WebGoat itself, so it is carried out — but that is the
+    // ordinary case, not the one this page hands a flag for. The flag stands for "a request forged
+    // on another site was accepted", and that outcome is exactly what the checks above make
+    // unreachable, so there is nothing left to hand out.
+    response.put("success", false);
+    response.put("message", "Appears the request came from the original host");
+    response.put("flag", null);
 
     return response;
   }

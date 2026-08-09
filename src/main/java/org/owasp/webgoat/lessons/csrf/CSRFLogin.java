@@ -5,7 +5,6 @@
 package org.owasp.webgoat.lessons.csrf;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.owasp.webgoat.container.CurrentUsername;
@@ -30,9 +29,11 @@ public class CSRFLogin implements AssignmentEndpoint {
     if (!CsrfProtection.hasValidToken(request) || !CsrfProtection.isSameOrigin(request)) {
       return failed(this).feedback("csrf-you-forgot-something").build();
     }
-    if (username.startsWith("csrf")) {
-      return success(this).feedback("csrf-login-success").build();
-    }
+    // What this assignment reports is "your browser was signed in as somebody else's account by a
+    // request another site made on your behalf". Authentication is now bound to an unguessable
+    // per-session token and to this application's own origin, so a session can only be established
+    // by a request the user themselves issued — whichever account is signed in here, it was not put
+    // there by a forged one, and there is no such finding left to report.
     return failed(this).feedback("csrf-login-failed").feedbackArgs(username).build();
   }
 }
