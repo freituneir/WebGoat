@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
-import javax.xml.XMLConstants;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import org.owasp.webgoat.container.users.WebGoatUser;
@@ -65,16 +64,17 @@ public class CommentsCache {
    * progress etc). In real life the XmlMapper bean defined above will be used automatically and the
    * Comment class can be directly used in the controller method (instead of a String)
    */
-  protected Comment parseXml(String xml, boolean securityEnabled)
-      throws XMLStreamException, JAXBException {
+  protected Comment parseXml(String xml) throws XMLStreamException, JAXBException {
     var jc = JAXBContext.newInstance(Comment.class);
     var xif = XMLInputFactory.newInstance();
 
-    // TODO fix me disabled for now.
-    if (securityEnabled) {
-      xif.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, ""); // Compliant
-      xif.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, ""); // compliant
-    }
+    // A comment is data, so the parser is configured to read data and nothing else. Turning off
+    // DTD support removes the entity declarations an XXE payload is built out of, and turning off
+    // external entity resolution means the parser will not open a file or a socket on behalf of
+    // whoever posted the document. Both are set unconditionally: there is no request for which
+    // resolving an external entity from user-supplied XML is the right thing to do.
+    xif.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+    xif.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
 
     var xsr = xif.createXMLStreamReader(new StringReader(xml));
 

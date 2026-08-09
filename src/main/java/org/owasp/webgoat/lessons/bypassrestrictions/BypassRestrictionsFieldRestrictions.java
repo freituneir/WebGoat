@@ -5,8 +5,8 @@
 package org.owasp.webgoat.lessons.bypassrestrictions;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import java.util.Set;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +17,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class BypassRestrictionsFieldRestrictions implements AssignmentEndpoint {
 
+  private static final Set<String> ALLOWED_SELECT_VALUES = Set.of("option1", "option2");
+  private static final Set<String> ALLOWED_RADIO_VALUES = Set.of("option1", "option2");
+  private static final Set<String> ALLOWED_CHECKBOX_VALUES = Set.of("on", "off");
+  private static final int SHORT_INPUT_MAX_LENGTH = 5;
+  private static final String READ_ONLY_VALUE = "change";
+
   @PostMapping("/BypassRestrictions/FieldRestrictions")
   @ResponseBody
   public AttackResult completed(
@@ -25,21 +31,19 @@ public class BypassRestrictionsFieldRestrictions implements AssignmentEndpoint {
       @RequestParam String checkbox,
       @RequestParam String shortInput,
       @RequestParam String readOnlyInput) {
-    if (select.equals("option1") || select.equals("option2")) {
-      return failed(this).build();
+    // The select/radio/checkbox/maxlength/readonly attributes only constrain the browser. The
+    // very same constraints are re-applied here, on the server, where the client cannot reach
+    // them: every field is checked against the allow-list of values the form is able to produce.
+    if (!ALLOWED_SELECT_VALUES.contains(select)
+        || !ALLOWED_RADIO_VALUES.contains(radio)
+        || !ALLOWED_CHECKBOX_VALUES.contains(checkbox)
+        || shortInput.length() > SHORT_INPUT_MAX_LENGTH
+        || !READ_ONLY_VALUE.equals(readOnlyInput)) {
+      return failed(this).output(REJECTED).build();
     }
-    if (radio.equals("option1") || radio.equals("option2")) {
-      return failed(this).build();
-    }
-    if (checkbox.equals("on") || checkbox.equals("off")) {
-      return failed(this).build();
-    }
-    if (shortInput.length() <= 5) {
-      return failed(this).build();
-    }
-    if ("change".equals(readOnlyInput)) {
-      return failed(this).build();
-    }
-    return success(this).build();
+    return failed(this).build();
   }
+
+  private static final String REJECTED =
+      "One or more fields did not pass server-side validation and the submission was rejected.";
 }

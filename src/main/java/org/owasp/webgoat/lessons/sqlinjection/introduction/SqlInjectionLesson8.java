@@ -4,8 +4,6 @@
  */
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
-import static java.sql.ResultSet.CONCUR_UPDATABLE;
-import static java.sql.ResultSet.TYPE_SCROLL_SENSITIVE;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
@@ -46,50 +44,42 @@ public class SqlInjectionLesson8 implements AssignmentEndpoint {
 
   protected AttackResult injectableQueryConfidentiality(String name, String auth_tan) {
     StringBuilder output = new StringBuilder();
-    String query =
-        "SELECT * FROM employees WHERE last_name = '"
-            + name
-            + "' AND auth_tan = '"
-            + auth_tan
-            + "'";
+    String query = "SELECT * FROM employees WHERE last_name = ? AND auth_tan = ?";
 
-    try (Connection connection = dataSource.getConnection()) {
-      try {
-        Statement statement =
-            connection.createStatement(
-                ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
-        log(connection, query);
-        ResultSet results = statement.executeQuery(query);
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
+      // Both fields are bound as values, so a quote or an 'OR' inside them stays part of the name
+      // or the TAN we are looking for and can no longer widen the result set.
+      statement.setString(1, name);
+      statement.setString(2, auth_tan);
+      log(connection, "employee lookup: last_name=" + name + ", auth_tan=" + auth_tan);
+      ResultSet results = statement.executeQuery();
 
-        if (results.getStatement() != null) {
-          if (results.first()) {
-            output.append(generateTable(results));
-            results.last();
+      if (results.getStatement() != null) {
+        if (results.first()) {
+          output.append(generateTable(results));
+          results.last();
 
-            if (results.getRow() > 1) {
-              // more than one record, the user succeeded
-              return success(this)
-                  .feedback("sql-injection.8.success")
-                  .output(output.toString())
-                  .build();
-            } else {
-              // only one record
-              return failed(this).feedback("sql-injection.8.one").output(output.toString()).build();
-            }
-
+          if (results.getRow() > 1) {
+            // more than one record, the user succeeded
+            return success(this)
+                .feedback("sql-injection.8.success")
+                .output(output.toString())
+                .build();
           } else {
-            // no results
-            return failed(this).feedback("sql-injection.8.no.results").build();
+            // only one record
+            return failed(this).feedback("sql-injection.8.one").output(output.toString()).build();
           }
-        } else {
-          return failed(this).build();
-        }
-      } catch (SQLException e) {
-        return failed(this)
-            .output("<br><span class='feedback-negative'>" + e.getMessage() + "</span>")
-            .build();
-      }
 
+        } else {
+          // no results
+          return failed(this).feedback("sql-injection.8.no.results").build();
+        }
+      } else {
+        return failed(this).build();
+      }
     } catch (Exception e) {
       return failed(this)
           .output("<br><span class='feedback-negative'>" + e.getMessage() + "</span>")
@@ -129,17 +119,17 @@ public class SqlInjectionLesson8 implements AssignmentEndpoint {
   }
 
   public static void log(Connection connection, String action) {
-    action = action.replace('\'', '"');
     Calendar cal = Calendar.getInstance();
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     String time = sdf.format(cal.getTime());
 
-    String logQuery =
-        "INSERT INTO access_log (time, action) VALUES ('" + time + "', '" + action + "')";
+    String logQuery = "INSERT INTO access_log (time, action) VALUES (?, ?)";
 
-    try {
-      Statement statement = connection.createStatement(TYPE_SCROLL_SENSITIVE, CONCUR_UPDATABLE);
-      statement.executeUpdate(logQuery);
+    // The logged action is written as a bound value instead of being concatenated into the insert.
+    try (PreparedStatement statement = connection.prepareStatement(logQuery)) {
+      statement.setString(1, time);
+      statement.setString(2, action);
+      statement.executeUpdate();
     } catch (SQLException e) {
       System.err.println(e.getMessage());
     }

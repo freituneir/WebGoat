@@ -60,9 +60,9 @@ public class ShopEndpoint {
 
   @GetMapping(value = "/coupons", produces = MediaType.APPLICATION_JSON_VALUE)
   public CheckoutCodes all() {
-    List<CheckoutCode> all = Lists.newArrayList();
-    all.addAll(this.checkoutCodes.getCodes());
-    all.add(new CheckoutCode(ClientSideFilteringFreeAssignment.SUPER_COUPON_CODE, 100));
-    return new CheckoutCodes(all);
+    // Filtering happens here, on the server. The response carries only the coupons the shop is
+    // willing to advertise; hiding a privileged code in the payload and trusting the page not to
+    // render it is not a control, because the raw JSON is always readable by the client.
+    return new CheckoutCodes(Lists.newArrayList(this.checkoutCodes.getCodes()));
   }
 }

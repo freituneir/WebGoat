@@ -60,7 +60,6 @@ public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
       return failed(this).feedback("jwt-invalid-token").build();
     } else {
       try {
-        final String[] errorMessage = {null};
         Jwt jwt =
             Jwts.parser()
                 .setSigningKeyResolver(
@@ -68,25 +67,24 @@ public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
                       @Override
                       public byte[] resolveSigningKeyBytes(JwsHeader header, Claims claims) {
                         final String kid = (String) header.get("kid");
-                        try (var connection = dataSource.getConnection()) {
-                          ResultSet rs =
-                              connection
-                                  .createStatement()
-                                  .executeQuery(
-                                      "SELECT key FROM jwt_keys WHERE id = '" + kid + "'");
-                          while (rs.next()) {
-                            return TextCodec.BASE64.decode(rs.getString(1));
+                        try (var connection = dataSource.getConnection();
+                            var statement =
+                                connection.prepareStatement(
+                                    "SELECT key FROM jwt_keys WHERE id = ?")) {
+                          statement.setString(1, kid);
+                          try (ResultSet rs = statement.executeQuery()) {
+                            if (rs.next()) {
+                              return TextCodec.BASE64.decode(rs.getString(1));
+                            }
                           }
                         } catch (SQLException e) {
-                          errorMessage[0] = e.getMessage();
+                          throw new JwtException("Unable to look up the signing key", e);
                         }
-                        return null;
+                        // A key id we do not know about can never lead to a valid signature.
+                        throw new JwtException("Unknown key id");
                       }
                     })
                 .parseClaimsJws(token);
-        if (errorMessage[0] != null) {
-          return failed(this).output(errorMessage[0]).build();
-        }
         Claims claims = (Claims) jwt.getBody();
         String username = (String) claims.get("username");
         if ("Jerry".equals(username)) {

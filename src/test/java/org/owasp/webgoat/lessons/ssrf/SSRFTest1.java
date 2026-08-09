@@ -34,11 +34,11 @@ public class SSRFTest1 extends LessonTest {
   }
 
   @Test
-  public void modifyUrlJerry() throws Exception {
+  public void aResourceTheePageNeverOfferedIsNotServed() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/SSRF/task1").param("url", "images/jerry.png"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test

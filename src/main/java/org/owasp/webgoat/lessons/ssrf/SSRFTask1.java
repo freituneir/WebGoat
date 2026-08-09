@@ -5,8 +5,8 @@
 package org.owasp.webgoat.lessons.ssrf;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import java.util.Map;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -19,6 +19,16 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints({"ssrf.hint1", "ssrf.hint2"})
 public class SSRFTask1 implements AssignmentEndpoint {
 
+  /**
+   * Strict server-side allow-list: the request parameter is only a key, never a resource path. The
+   * server decides which resources it is willing to serve, so a client cannot ask for a resource
+   * this page never offered.
+   */
+  private static final Map<String, String> ALLOWED_IMAGES =
+      Map.of(
+          "images/tom.png",
+          "<img class=\"image\" alt=\"Tom\" src=\"images/tom.png\" width=\"25%\" height=\"25%\">");
+
   @PostMapping("/SSRF/task1")
   @ResponseBody
   public AttackResult completed(@RequestParam String url) {
@@ -26,26 +36,13 @@ public class SSRFTask1 implements AssignmentEndpoint {
   }
 
   protected AttackResult stealTheCheese(String url) {
-    try {
-      StringBuilder html = new StringBuilder();
-
-      if (url.matches("images/tom\\.png")) {
-        html.append(
-            "<img class=\"image\" alt=\"Tom\" src=\"images/tom.png\" width=\"25%\""
-                + " height=\"25%\">");
-        return failed(this).feedback("ssrf.tom").output(html.toString()).build();
-      } else if (url.matches("images/jerry\\.png")) {
-        html.append(
-            "<img class=\"image\" alt=\"Jerry\" src=\"images/jerry.png\" width=\"25%\""
-                + " height=\"25%\">");
-        return success(this).feedback("ssrf.success").output(html.toString()).build();
-      } else {
-        html.append("<img class=\"image\" alt=\"Silly Cat\" src=\"images/cat.jpg\">");
-        return failed(this).feedback("ssrf.failure").output(html.toString()).build();
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-      return failed(this).output(e.getMessage()).build();
+    String image = ALLOWED_IMAGES.get(url);
+    if (image == null) {
+      return failed(this)
+          .feedback("ssrf.failure")
+          .output("<img class=\"image\" alt=\"Silly Cat\" src=\"images/cat.jpg\">")
+          .build();
     }
+    return failed(this).feedback("ssrf.tom").output(image).build();
   }
 }

@@ -8,6 +8,9 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.security.NoTypePermission;
+import com.thoughtworks.xstream.security.NullPermission;
+import com.thoughtworks.xstream.security.PrimitiveTypePermission;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -27,6 +30,16 @@ public class VulnerableComponentsLesson implements AssignmentEndpoint {
     xstream.setClassLoader(Contact.class.getClassLoader());
     xstream.alias("contact", ContactImpl.class);
     xstream.ignoreUnknownElements();
+
+    // An XML document that may name any type on the classpath is not data, it is a program: the
+    // unmarshaller will construct whatever it is asked for, and a proxy wired to an EventHandler
+    // is enough to turn that into command execution. Only the contact record this endpoint
+    // actually expects, and the primitives it is built from, may be instantiated here.
+    xstream.addPermission(NoTypePermission.NONE);
+    xstream.addPermission(NullPermission.NULL);
+    xstream.addPermission(PrimitiveTypePermission.PRIMITIVES);
+    xstream.allowTypes(new Class[] {ContactImpl.class, String.class, Integer.class});
+
     Contact contact = null;
 
     try {

@@ -4,6 +4,8 @@
  */
 package org.owasp.webgoat.lessons.authbypass;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,26 +57,31 @@ public class AccountVerificationHelper {
   // end of cheating check ... the method below is the one of real interest. Can you find the flaw?
 
   public boolean verifyAccount(Integer userId, HashMap<String, String> submittedQuestions) {
-    // short circuit if no questions are submitted
-    if (submittedQuestions.entrySet().size() != secQuestionStore.get(verifyUserId).size()) {
+    Map<String, String> expectedAnswers = secQuestionStore.get(userId);
+    if (expectedAnswers == null) {
       return false;
     }
 
-    if (submittedQuestions.containsKey("secQuestion0")
-        && !submittedQuestions
-            .get("secQuestion0")
-            .equals(secQuestionStore.get(verifyUserId).get("secQuestion0"))) {
+    // Drive the check from the questions on record, never from the keys the client chose to send:
+    // every question on record must be answered and every answer must match. Unexpected keys are
+    // rejected as well, so a request cannot satisfy the count while skipping every real question.
+    if (submittedQuestions.size() != expectedAnswers.size()
+        || !submittedQuestions.keySet().containsAll(expectedAnswers.keySet())) {
       return false;
     }
 
-    if (submittedQuestions.containsKey("secQuestion1")
-        && !submittedQuestions
-            .get("secQuestion1")
-            .equals(secQuestionStore.get(verifyUserId).get("secQuestion1"))) {
-      return false;
+    for (Map.Entry<String, String> question : expectedAnswers.entrySet()) {
+      String submittedAnswer = submittedQuestions.get(question.getKey());
+      if (submittedAnswer == null || !constantTimeEquals(submittedAnswer, question.getValue())) {
+        return false;
+      }
     }
 
-    // else
     return true;
+  }
+
+  private static boolean constantTimeEquals(String submitted, String expected) {
+    return MessageDigest.isEqual(
+        submitted.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
   }
 }

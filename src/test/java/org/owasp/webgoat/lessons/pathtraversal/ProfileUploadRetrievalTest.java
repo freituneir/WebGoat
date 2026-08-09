@@ -4,8 +4,8 @@
  */
 package org.owasp.webgoat.lessons.pathtraversal;
 
-import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,38 +33,29 @@ class ProfileUploadRetrievalTest extends LessonTest {
   }
 
   @Test
-  void solve() throws Exception {
-    // Look at the response
-    mockMvc
-        .perform(get("/PathTraversal/random-picture"))
-        .andExpect(status().is(200))
-        .andExpect(header().exists("Location"))
-        .andExpect(header().string("Location", containsString("?id=")))
-        .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_JPEG));
-
-    // Browse the directories
+  void anEncodedTraversalNoLongerLeavesThePicturesDirectory() throws Exception {
     var uri = new URI("/PathTraversal/random-picture?id=%2E%2E%2F%2E%2E%2F");
     mockMvc
         .perform(get(uri))
         .andExpect(status().is(404))
-        // .andDo(MockMvcResultHandlers.print())
-        .andExpect(content().string(containsString("path-traversal-secret.jpg")));
+        .andExpect(content().string(not(containsString("path-traversal-secret"))));
+  }
 
-    // Retrieve the secret file (note: .jpg is added by the server)
-    uri = new URI("/PathTraversal/random-picture?id=%2E%2E%2F%2E%2E%2Fpath-traversal-secret");
+  @Test
+  void theSecretFileIsNeverServed() throws Exception {
+    var uri = new URI("/PathTraversal/random-picture?id=%2E%2E%2F%2E%2E%2Fpath-traversal-secret");
     mockMvc
         .perform(get(uri))
-        .andExpect(status().is(200))
-        .andExpect(
-            content().string("You found it submit the SHA-512 hash of your username as answer"))
-        .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_JPEG));
+        .andExpect(status().is(404))
+        .andExpect(content().string(not(containsString("You found it"))));
+  }
 
-    // Post flag
+  @Test
+  void theAnswerCanNoLongerBeDerivedFromTheAccountName() throws Exception {
     mockMvc
         .perform(post("/PathTraversal/random").param("secret", Sha512DigestUtils.shaHex("test")))
         .andExpect(status().is(200))
-        .andExpect(jsonPath("$.assignment", equalTo("ProfileUploadRetrieval")))
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test

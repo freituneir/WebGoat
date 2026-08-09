@@ -5,13 +5,8 @@
 package org.owasp.webgoat.lessons.ssrf;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -24,6 +19,16 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints({"ssrf.hint3"})
 public class SSRFTask2 implements AssignmentEndpoint {
 
+  /**
+   * The server no longer performs an outbound request for a client supplied URL. The parameter is
+   * only a key into a strict server-side allow-list of the resources this page offers; anything
+   * else is rejected without any network access.
+   */
+  private static final Map<String, String> ALLOWED_IMAGES =
+      Map.of(
+          "images/cat.png", "<img class=\"image\" alt=\"image post\" src=\"images/cat.jpg\">",
+          "images/cat.jpg", "<img class=\"image\" alt=\"image post\" src=\"images/cat.jpg\">");
+
   @PostMapping("/SSRF/task2")
   @ResponseBody
   public AttackResult completed(@RequestParam String url) {
@@ -31,24 +36,13 @@ public class SSRFTask2 implements AssignmentEndpoint {
   }
 
   protected AttackResult furBall(String url) {
-    if (url.matches("http://ifconfig\\.pro")) {
-      String html;
-      try (InputStream in = new URL(url).openStream()) {
-        html =
-            new String(in.readAllBytes(), StandardCharsets.UTF_8)
-                .replaceAll("\n", "<br>"); // Otherwise the \n gets escaped in the response
-      } catch (MalformedURLException e) {
-        return getFailedResult(e.getMessage());
-      } catch (IOException e) {
-        // in case the external site is down, the test and lesson should still be ok
-        html =
-            "<html><body>Although the http://ifconfig.pro site is down, you still managed to solve"
-                + " this exercise the right way!</body></html>";
-      }
-      return success(this).feedback("ssrf.success").output(html).build();
+    String image = ALLOWED_IMAGES.get(url);
+    if (image == null) {
+      return getFailedResult(
+          "This server only serves the images offered by this page, it does not fetch"
+              + " client-supplied URLs.");
     }
-    var html = "<img class=\"image\" alt=\"image post\" src=\"images/cat.jpg\">";
-    return getFailedResult(html);
+    return getFailedResult(image);
   }
 
   private AttackResult getFailedResult(String errorMsg) {

@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.Cookie;
-import org.hamcrest.core.StringContains;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.container.plugins.LessonTest;
@@ -41,7 +40,7 @@ public class CSRFFeedbackTest extends LessonTest {
   }
 
   @Test
-  public void csrfAttack() throws Exception {
+  public void aSimpleCrossSiteFormPostIsNotAcceptedAsJson() throws Exception {
     mockMvc
         .perform(
             post("/csrf/feedback/message")
@@ -52,7 +51,22 @@ public class CSRFFeedbackTest extends LessonTest {
                 .content(
                     "{\"name\": \"Test\", \"email\": \"test1233@dfssdf.de\", \"subject\":"
                         + " \"service\", \"message\":\"dsaffd\"}"))
-        .andExpect(jsonPath("lessonCompleted", is(true)))
-        .andExpect(jsonPath("feedback", StringContains.containsString("the flag is: ")));
+        .andExpect(status().isUnsupportedMediaType());
+  }
+
+  @Test
+  public void aJsonPostWithoutTheAntiCsrfTokenIsRejected() throws Exception {
+    mockMvc
+        .perform(
+            post("/csrf/feedback/message")
+                .contentType(MediaType.APPLICATION_JSON)
+                .cookie(new Cookie("JSESSIONID", "test"))
+                .header("host", "localhost:8080")
+                .header("referer", "webgoat.org")
+                .content(
+                    "{\"name\": \"Test\", \"email\": \"test1233@dfssdf.de\", \"subject\":"
+                        + " \"service\", \"message\":\"dsaffd\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("lessonCompleted", is(false)));
   }
 }

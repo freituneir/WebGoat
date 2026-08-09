@@ -4,6 +4,7 @@
  */
 package org.owasp.webgoat.lessons.missingac;
 
+import static org.owasp.webgoat.lessons.missingac.MissingFunctionAC.PASSWORD_SALT_SIMPLE;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -30,11 +31,24 @@ class MissingFunctionYourHashTest extends LessonTest {
   }
 
   @Test
-  void hashMatches() throws Exception {
+  void aHashPrecomputedFromTheOldConstantSaltNoLongerMatches() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/access-control/user-hash")
                 .param("userHash", "SVtOlaa+ER+w2eoIIVE5/77umvhcsh5V8UyDLUa1Itg="))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+  }
+
+  @Test
+  void hashMatches() throws Exception {
+    var userHash =
+        new DisplayUser(new User("Jerry", "doesnotreallymatter", true), PASSWORD_SALT_SIMPLE)
+            .getUserHash();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/access-control/user-hash").param("userHash", userHash))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
   }

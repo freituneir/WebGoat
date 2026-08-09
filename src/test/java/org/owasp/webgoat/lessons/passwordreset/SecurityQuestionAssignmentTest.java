@@ -26,7 +26,7 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
   }
 
   @Test
-  public void oneQuestionShouldNotSolveTheAssignment() throws Exception {
+  public void aQuestionFromTheWellKnownListIsRefused() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
@@ -35,13 +35,13 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
         .andExpect(
             jsonPath(
                 "$.feedback",
-                CoreMatchers.is(messages.getMessage("password-questions-one-successful"))))
+                CoreMatchers.is(messages.getMessage("password-questions-weak-question"))))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)))
         .andExpect(jsonPath("$.output", CoreMatchers.notNullValue()));
   }
 
   @Test
-  public void twoQuestionsShouldSolveTheAssignment() throws Exception {
+  public void twoQuestionsFromTheWellKnownListStillDoNotSolveTheAssignment() throws Exception {
     MockHttpSession mocksession = new MockHttpSession();
     mockMvc
         .perform(
@@ -57,46 +57,45 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
                 .param("question", "In what year was your mother born?")
                 .session(mocksession))
         .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.solved"))))
-        .andExpect(jsonPath("$.output", CoreMatchers.notNullValue()))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
-  }
-
-  @Test
-  public void answeringSameQuestionTwiceShouldNotSolveAssignment() throws Exception {
-    MockHttpSession mocksession = new MockHttpSession();
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
-                .param("question", "What is your favorite animal?")
-                .session(mocksession))
-        .andExpect(status().isOk());
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
-                .param("question", "What is your favorite animal?")
-                .session(mocksession))
-        .andExpect(status().isOk())
-        .andExpect(
-            jsonPath(
-                "$.feedback",
-                CoreMatchers.is(messages.getMessage("password-questions-one-successful"))))
-        .andExpect(jsonPath("$.output", CoreMatchers.notNullValue()))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
-  public void solvingForOneUserDoesNotSolveForOtherUser() throws Exception {
+  public void aSelfChosenQuestionIsAcceptedOnceTheWeakOnesHaveBeenReviewed() throws Exception {
     MockHttpSession mocksession = new MockHttpSession();
     mockMvc.perform(
         MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
             .param("question", "What is your favorite animal?")
             .session(mocksession));
+    mockMvc.perform(
+        MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
+            .param("question", "In what year was your mother born?")
+            .session(mocksession));
+
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
-                .param("question", "In what year was your mother born?")
+                .param("question", "Which song was playing when I met my best friend?")
+                .session(mocksession))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+  }
+
+  @Test
+  public void solvingForOneSessionDoesNotSolveForAnother() throws Exception {
+    MockHttpSession mocksession = new MockHttpSession();
+    mockMvc.perform(
+        MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
+            .param("question", "What is your favorite animal?")
+            .session(mocksession));
+    mockMvc.perform(
+        MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
+            .param("question", "In what year was your mother born?")
+            .session(mocksession));
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
+                .param("question", "Which song was playing when I met my best friend?")
                 .session(mocksession))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
 
@@ -104,7 +103,7 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
-                .param("question", "What is your favorite animal?")
+                .param("question", "Which song was playing when I met my best friend?")
                 .session(mocksession2))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }

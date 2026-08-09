@@ -213,7 +213,11 @@ define(['jquery',
 
             /* for testing */
             showTestParam: function (param) {
-                this.$el.find('.lesson-content').html('test:' + param);
+                // The parameter comes straight out of the URL fragment, so it is written as text.
+                // Handing it to .html() would parse it as markup and execute any script it carries,
+                // which is a DOM-based XSS: the payload never reaches the server, so no amount of
+                // server-side encoding can help here -- the sink itself has to be non-executing.
+                this.$el.find('.lesson-content').text('test:' + param);
             },
 
             resetLesson: function () {

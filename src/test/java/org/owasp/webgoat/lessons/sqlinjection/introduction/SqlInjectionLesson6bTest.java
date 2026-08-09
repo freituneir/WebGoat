@@ -15,13 +15,13 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 public class SqlInjectionLesson6bTest extends LessonTest {
 
   @Test
-  public void submitCorrectPassword() throws Exception {
+  public void theShippedDefaultPasswordIsNoLongerAccepted() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6b")
                 .param("userid_6b", "passW0rD"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test

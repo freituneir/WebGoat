@@ -8,10 +8,10 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -48,12 +48,16 @@ public class SqlInjectionLesson6a implements AssignmentEndpoint {
   }
 
   public AttackResult injectableQuery(String accountName) {
-    String query = "";
-    try (Connection connection = dataSource.getConnection()) {
+    // The account name is bound as a value, so it can never change the structure of the query.
+    String query = "SELECT * FROM user_data WHERE last_name = ?";
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
       boolean usedUnion = this.unionQueryChecker(accountName);
-      query = "SELECT * FROM user_data WHERE last_name = '" + accountName + "'";
+      statement.setString(1, accountName);
 
-      return executeSqlInjection(connection, query, usedUnion);
+      return executeQuery(statement, query, usedUnion);
     } catch (Exception e) {
       return failed(this)
           .output(this.getClass().getName() + " : " + e.getMessage() + YOUR_QUERY_WAS + query)
@@ -65,11 +69,9 @@ public class SqlInjectionLesson6a implements AssignmentEndpoint {
     return accountName.matches("(?i)(^[^-/*;)]*)(\\s*)UNION(.*$)");
   }
 
-  private AttackResult executeSqlInjection(Connection connection, String query, boolean usedUnion) {
-    try (Statement statement =
-        connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
-
-      ResultSet results = statement.executeQuery(query);
+  private AttackResult executeQuery(PreparedStatement statement, String query, boolean usedUnion) {
+    try {
+      ResultSet results = statement.executeQuery();
 
       if (!((results != null) && results.first())) {
         return failed(this)

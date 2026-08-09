@@ -26,11 +26,11 @@ public class SSRFTest2 extends LessonTest {
   }
 
   @Test
-  public void modifyUrlIfconfigPro() throws Exception {
+  public void aClientSuppliedUrlIsNotFetchedByTheServer() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/SSRF/task2").param("url", "http://ifconfig.pro"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test

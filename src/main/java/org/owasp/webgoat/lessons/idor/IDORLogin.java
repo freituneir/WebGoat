@@ -13,6 +13,8 @@ import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.container.session.LessonSession;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -21,7 +23,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @AssignmentHints({"idor.hints.idor_login"})
 public class IDORLogin implements AssignmentEndpoint {
+  /**
+   * Passwords are never kept in plaintext, only as a salted adaptive hash. Tom's password is the
+   * one published in the lesson text (IDOR_login.adoc); Bill is not a login account here, so his
+   * password is a random value that is not published anywhere.
+   */
+  private static final String TOM_PASSWORD_HASH =
+      "$2a$10$vSeh/aLAVe6UGJyXzN1E4urtpYAZxVyIT.eOiCajLjqD/FH5tWchG";
+
+  private static final String BILL_PASSWORD_HASH =
+      "$2a$10$7yOOqno8XejRXRMg8eO7VOZNS326TnK4gMh4ASESPBIBuLuh09vQm";
+
   private final LessonSession lessonSession;
+  private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
   public IDORLogin(LessonSession lessonSession) {
     this.lessonSession = lessonSession;
@@ -32,13 +46,13 @@ public class IDORLogin implements AssignmentEndpoint {
   public void initIDORInfo() {
 
     idorUserInfo.put("tom", new HashMap<String, String>());
-    idorUserInfo.get("tom").put("password", "cat");
+    idorUserInfo.get("tom").put("passwordHash", TOM_PASSWORD_HASH);
     idorUserInfo.get("tom").put("id", "2342384");
     idorUserInfo.get("tom").put("color", "yellow");
     idorUserInfo.get("tom").put("size", "small");
 
     idorUserInfo.put("bill", new HashMap<String, String>());
-    idorUserInfo.get("bill").put("password", "buffalo");
+    idorUserInfo.get("bill").put("passwordHash", BILL_PASSWORD_HASH);
     idorUserInfo.get("bill").put("id", "2342388");
     idorUserInfo.get("bill").put("color", "brown");
     idorUserInfo.get("bill").put("size", "large");
@@ -49,16 +63,16 @@ public class IDORLogin implements AssignmentEndpoint {
   public AttackResult completed(@RequestParam String username, @RequestParam String password) {
     initIDORInfo();
 
-    if (idorUserInfo.containsKey(username)) {
-      if ("tom".equals(username) && idorUserInfo.get("tom").get("password").equals(password)) {
-        lessonSession.setValue("idor-authenticated-as", username);
-        lessonSession.setValue("idor-authenticated-user-id", idorUserInfo.get(username).get("id"));
-        return success(this).feedback("idor.login.success").feedbackArgs(username).build();
-      } else {
-        return failed(this).feedback("idor.login.failure").build();
-      }
-    } else {
-      return failed(this).feedback("idor.login.failure").build();
+    Map<String, String> userInfo = idorUserInfo.get(username);
+    if (userInfo != null
+        && "tom".equals(username)
+        && passwordEncoder.matches(password, userInfo.get("passwordHash"))) {
+      lessonSession.setValue("idor-authenticated-as", username);
+      lessonSession.setValue("idor-authenticated-user-id", userInfo.get("id"));
+      // the profile of the authenticated user is addressed by an indirect reference from here on
+      ProfileReferences.issue(lessonSession);
+      return success(this).feedback("idor.login.success").feedbackArgs(username).build();
     }
+    return failed(this).feedback("idor.login.failure").build();
   }
 }

@@ -38,8 +38,11 @@ public class CSRFFeedback implements AssignmentEndpoint {
     this.objectMapper = objectMapper;
   }
 
+  // Only a real JSON content type is accepted: a simple cross site form post (text/plain,
+  // multipart or url encoded) can no longer reach this endpoint, it would need a preflight.
   @PostMapping(
       value = "/csrf/feedback/message",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = {"application/json"})
   @ResponseBody
   public AttackResult completed(HttpServletRequest request, @RequestBody String feedback) {
@@ -54,9 +57,13 @@ public class CSRFFeedback implements AssignmentEndpoint {
     } catch (IOException e) {
       return failed(this).feedback(ExceptionUtils.getStackTrace(e)).build();
     }
-    boolean correctCSRF =
-        requestContainsWebGoatCookie(request.getCookies())
-            && request.getContentType().contains(MediaType.TEXT_PLAIN_VALUE);
+    // The feedback is only accepted when it carries the anti-CSRF token of this session.
+    if (!CsrfProtection.hasValidToken(request)) {
+      return failed(this)
+          .output("Missing or invalid anti-CSRF token, the feedback was not accepted.")
+          .build();
+    }
+    boolean correctCSRF = requestContainsWebGoatCookie(request.getCookies());
     correctCSRF &= hostOrRefererDifferentHost(request);
     if (correctCSRF) {
       String flag = UUID.randomUUID().toString();

@@ -37,6 +37,16 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
 
+  /**
+   * The location of the key set is part of the server configuration. It is deliberately not taken
+   * from the "jku" header of the token, an attacker controls every header of the token he sends and
+   * would otherwise simply point us at a key set he owns.
+   */
+  private static final String TRUSTED_JWKS_URL =
+      "https://cognito-idp.us-east-1.amazonaws.com/webgoat/.well-known/jwks.json";
+
+  private static final int TIMEOUT_IN_MILLIS = 2000;
+
   @PostMapping("jku/follow/{user}")
   public @ResponseBody String follow(@PathVariable("user") String user) {
     if ("Jerry".equals(user)) {
@@ -53,8 +63,10 @@ public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
     } else {
       try {
         var decodedJWT = JWT.decode(token);
-        var jku = decodedJWT.getHeaderClaim("jku");
-        var jwkProvider = new JwkProviderBuilder(new URL(jku.asString())).build();
+        var jwkProvider =
+            new JwkProviderBuilder(new URL(TRUSTED_JWKS_URL))
+                .timeouts(TIMEOUT_IN_MILLIS, TIMEOUT_IN_MILLIS)
+                .build();
         var jwk = jwkProvider.get(decodedJWT.getKeyId());
         var algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey());
         JWT.require(algorithm).build().verify(decodedJWT);

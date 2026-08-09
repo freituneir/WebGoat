@@ -4,7 +4,6 @@
  */
 package org.owasp.webgoat.lessons.passwordreset;
 
-import static java.util.Optional.of;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
@@ -28,6 +27,10 @@ public class SecurityQuestionAssignment implements AssignmentEndpoint {
 
   private final TriedQuestions triedQuestions;
 
+  /**
+   * Security questions taken from a fixed, publicly known list are not accepted as a recovery
+   * factor, for every one of them the reason why it is weak is explained.
+   */
   private static Map<String, String> questions;
 
   static {
@@ -80,16 +83,22 @@ public class SecurityQuestionAssignment implements AssignmentEndpoint {
   @PostMapping("/PasswordReset/SecurityQuestions")
   @ResponseBody
   public AttackResult completed(@RequestParam String question) {
-    var answer = of(questions.get(question));
-    if (answer.isPresent()) {
+    var weakness = questions.get(question);
+    if (weakness != null) {
       triedQuestions.incr(question);
-      if (triedQuestions.isComplete()) {
-        return success(this).output("<b>" + answer + "</b>").build();
-      }
+      return informationMessage(this)
+          .feedback("password-questions-weak-question")
+          .output(weakness)
+          .build();
     }
-    return informationMessage(this)
-        .feedback("password-questions-one-successful")
-        .output(answer.orElse("Unknown question, please try again..."))
+    if (question.isBlank() || !triedQuestions.isComplete()) {
+      return informationMessage(this).feedback("password-questions-review-first").build();
+    }
+    // Only a question the user made up themselves is accepted, it is not part of a list an
+    // attacker can look up and prepare answers for.
+    return success(this)
+        .output(
+            "<b>A question only you know the answer to is much harder to guess or look up.</b>")
         .build();
   }
 }

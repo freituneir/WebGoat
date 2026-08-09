@@ -6,9 +6,18 @@ package org.owasp.webgoat.lessons.idor;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** Created by jason on 1/5/17. */
 public class UserProfile {
+
+  /**
+   * Attributes of a profile that may be disclosed to its owner, in other words the keys returned by
+   * {@link #disclosedProfileToMap()}. Internal attributes such as the user id, the role and the
+   * admin flag are deliberately not part of this set.
+   */
+  static final Set<String> DISCLOSED_ATTRIBUTES = Set.of("name", "color", "size");
+
   private String userId;
   private String name;
   private String color;
@@ -44,13 +53,15 @@ public class UserProfile {
     }
   }
 
-  public Map<String, Object> profileToMap() {
+  /**
+   * Serializes only the attributes the owner of the profile is entitled to see. The user id, the
+   * role and the admin flag are internal and are never handed to the client.
+   */
+  public Map<String, Object> disclosedProfileToMap() {
     Map<String, Object> profileMap = new HashMap<>();
-    profileMap.put("userId", this.userId);
     profileMap.put("name", this.name);
     profileMap.put("color", this.color);
     profileMap.put("size", this.size);
-    profileMap.put("role", this.role);
     return profileMap;
   }
 

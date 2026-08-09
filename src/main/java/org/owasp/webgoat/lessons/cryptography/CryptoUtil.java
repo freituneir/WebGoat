@@ -45,6 +45,10 @@ public class CryptoUtil {
     return keyPairGenerator.generateKeyPair();
   }
 
+  /**
+   * Renders the private half of the key pair. Strictly for use inside the process (key storage,
+   * tests); it must never be written to a response.
+   */
   public static String getPrivateKeyInPEM(KeyPair keyPair) {
     String encodedString = "-----BEGIN PRIVATE KEY-----\n";
     encodedString =
@@ -55,6 +59,17 @@ public class CryptoUtil {
             + "\n";
     encodedString = encodedString + "-----END PRIVATE KEY-----\n";
     return encodedString;
+  }
+
+  /**
+   * Renders the public half of the key pair. This is the only half that may ever leave the server:
+   * it is all a relying party needs in order to verify a signature.
+   */
+  public static String getPublicKeyInPEM(KeyPair keyPair) {
+    return "-----BEGIN PUBLIC KEY-----\n"
+        + new String(
+            Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), Charset.forName("UTF-8"))
+        + "\n-----END PUBLIC KEY-----\n";
   }
 
   public static String signMessage(String message, PrivateKey privateKey) {

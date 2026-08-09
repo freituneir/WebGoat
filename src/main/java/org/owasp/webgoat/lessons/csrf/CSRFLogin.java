@@ -7,6 +7,7 @@ package org.owasp.webgoat.lessons.csrf;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -23,7 +24,12 @@ public class CSRFLogin implements AssignmentEndpoint {
       path = "/csrf/login",
       produces = {"application/json"})
   @ResponseBody
-  public AttackResult completed(@CurrentUsername String username) {
+  public AttackResult completed(HttpServletRequest request, @CurrentUsername String username) {
+    // Without the anti-CSRF token of this session the request is not proven to be sent by the user
+    // himself, so it is not acted upon.
+    if (!CsrfProtection.hasValidToken(request)) {
+      return failed(this).feedback("csrf-you-forgot-something").build();
+    }
     if (username.startsWith("csrf")) {
       return success(this).feedback("csrf-login-success").build();
     }

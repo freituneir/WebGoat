@@ -37,8 +37,8 @@ class SpoofCookieAssignmentTest extends LessonTest {
   private static final String ERASE_COOKIE_CONTEXT_PATH = "/SpoofCookie/cleanup";
 
   @Test
-  @DisplayName("Lesson completed")
-  void success() throws Exception {
+  @DisplayName("A hand-crafted cookie for another user is rejected")
+  void forgedCookieIsRejected() throws Exception {
     Cookie cookie = new Cookie(COOKIE_NAME, "NjI2MTcwNGI3YTQxNGE1OTU2NzQ2ZDZmNzQ=");
 
     ResultActions result =
@@ -49,7 +49,7 @@ class SpoofCookieAssignmentTest extends LessonTest {
                 .param("password", ""));
 
     result.andExpect(status().isOk());
-    result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+    result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test

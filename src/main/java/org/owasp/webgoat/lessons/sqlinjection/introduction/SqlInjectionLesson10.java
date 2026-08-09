@@ -8,6 +8,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -32,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
     })
 public class SqlInjectionLesson10 implements AssignmentEndpoint {
 
+  private static final String LIKE_ESCAPE = "#";
+
   private final LessonDataSource dataSource;
 
   public SqlInjectionLesson10(LessonDataSource dataSource) {
@@ -46,14 +49,16 @@ public class SqlInjectionLesson10 implements AssignmentEndpoint {
 
   protected AttackResult injectableQueryAvailability(String action) {
     StringBuilder output = new StringBuilder();
-    String query = "SELECT * FROM access_log WHERE action LIKE '%" + action + "%'";
+    String query = "SELECT * FROM access_log WHERE action LIKE ? ESCAPE '" + LIKE_ESCAPE + "'";
 
     try (Connection connection = dataSource.getConnection()) {
-      try {
-        Statement statement =
-            connection.createStatement(
-                ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        ResultSet results = statement.executeQuery(query);
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
+        // The search term is bound as a value and its LIKE wildcards are escaped, so it can only
+        // filter rows: it can neither match everything nor start a second statement.
+        statement.setString(1, "%" + escapeLikeWildcards(action) + "%");
+        ResultSet results = statement.executeQuery();
 
         if (results.getStatement() != null) {
           results.first();
@@ -91,6 +96,14 @@ public class SqlInjectionLesson10 implements AssignmentEndpoint {
           .output("<span class='feedback-negative'>" + e.getMessage() + "</span>")
           .build();
     }
+  }
+
+  /** Makes the LIKE metacharacters part of the searched text instead of part of the pattern. */
+  private static String escapeLikeWildcards(String action) {
+    return action
+        .replace(LIKE_ESCAPE, LIKE_ESCAPE + LIKE_ESCAPE)
+        .replace("%", LIKE_ESCAPE + "%")
+        .replace("_", LIKE_ESCAPE + "_");
   }
 
   private boolean tableExists(Connection connection) {

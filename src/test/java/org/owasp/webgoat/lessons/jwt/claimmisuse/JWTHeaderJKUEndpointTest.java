@@ -54,14 +54,15 @@ class JWTHeaderJKUEndpointTest extends LessonTest {
   }
 
   @Test
-  void solve() throws Exception {
+  @DisplayName("A key set the token points at itself is never fetched, so the token is rejected")
+  void aKeySetNamedByTheTokenIsNotTrusted() throws Exception {
     setupJsonWebKeySetInWebWolf();
     var token = createTokenAndSignIt();
 
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/jku/delete").param("token", token).content(""))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test

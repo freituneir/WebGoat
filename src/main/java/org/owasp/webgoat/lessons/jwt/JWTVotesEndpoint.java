@@ -11,13 +11,14 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.impl.TextCodec;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -52,11 +53,32 @@ import org.springframework.web.bind.annotation.RestController;
 })
 public class JWTVotesEndpoint implements AssignmentEndpoint {
 
-  public static final String JWT_PASSWORD = TextCodec.BASE64.encode("victory");
-  private static String validUsers = "TomJerrySylvester";
+  /** Random 512 bits key generated at startup, a guessable word can be brute forced offline. */
+  static final String JWT_PASSWORD = generateSecretKey();
+
+  /**
+   * The roles of the users of this application are administered server side, they are never derived
+   * from a claim inside the token the client sends us.
+   */
+  private static final Map<String, String> userRoles =
+      Map.of("Tom", "user", "Jerry", "user", "Sylvester", "user");
 
   private static int totalVotes = 38929;
   private final Map<String, Vote> votes = new HashMap<>();
+
+  private static String generateSecretKey() {
+    byte[] key = new byte[64];
+    new SecureRandom().nextBytes(key);
+    return TextCodec.BASE64.encode(key);
+  }
+
+  private static boolean isKnownUser(String user) {
+    return user != null && userRoles.containsKey(user);
+  }
+
+  private static boolean isAdmin(String user) {
+    return user != null && "admin".equals(userRoles.get(user));
+  }
 
   @PostConstruct
   public void initVotes() {
@@ -102,7 +124,7 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
 
   @GetMapping("/JWT/votings/login")
   public void login(@RequestParam("user") String user, HttpServletResponse response) {
-    if (validUsers.contains(user)) {
+    if (isKnownUser(user)) {
       Claims claims = Jwts.claims().setIssuedAt(Date.from(Instant.now().plus(Duration.ofDays(10))));
       claims.put("admin", "false");
       claims.put("user", user);
@@ -136,10 +158,9 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
       value.setSerializationView(Views.GuestView.class);
     } else {
       try {
-        Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
-        Claims claims = (Claims) jwt.getBody();
-        String user = (String) claims.get("user");
-        if ("Guest".equals(user) || !validUsers.contains(user)) {
+        Jws<Claims> jws = Jwts.parser().setSigningKey(JWT_PASSWORD).parseClaimsJws(accessToken);
+        String user = (String) jws.getBody().get("user");
+        if (!isKnownUser(user)) {
           value.setSerializationView(Views.GuestView.class);
         } else {
           value.setSerializationView(Views.UserView.class);
@@ -161,10 +182,9 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     } else {
       try {
-        Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
-        Claims claims = (Claims) jwt.getBody();
-        String user = (String) claims.get("user");
-        if (!validUsers.contains(user)) {
+        Jws<Claims> jws = Jwts.parser().setSigningKey(JWT_PASSWORD).parseClaimsJws(accessToken);
+        String user = (String) jws.getBody().get("user");
+        if (!isKnownUser(user)) {
           return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         } else {
           ofNullable(votes.get(title)).ifPresent(v -> v.incrementNumberOfVotes(totalVotes));
@@ -184,10 +204,10 @@ public class JWTVotesEndpoint implements AssignmentEndpoint {
       return failed(this).feedback("jwt-invalid-token").build();
     } else {
       try {
-        Jwt jwt = Jwts.parser().setSigningKey(JWT_PASSWORD).parse(accessToken);
-        Claims claims = (Claims) jwt.getBody();
-        boolean isAdmin = Boolean.valueOf(String.valueOf(claims.get("admin")));
-        if (!isAdmin) {
+        Jws<Claims> jws = Jwts.parser().setSigningKey(JWT_PASSWORD).parseClaimsJws(accessToken);
+        String user = (String) jws.getBody().get("user");
+        // The token only tells us who the user is, whether he may reset the votes is decided here.
+        if (!isAdmin(user)) {
           return failed(this).feedback("jwt-only-admin").build();
         } else {
           votes.values().forEach(vote -> vote.reset());

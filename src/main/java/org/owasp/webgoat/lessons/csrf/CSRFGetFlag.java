@@ -30,35 +30,22 @@ public class CSRFGetFlag {
 
     Map<String, Object> response = new HashMap<>();
 
-    String host = (req.getHeader("host") == null) ? "NULL" : req.getHeader("host");
-    String referer = (req.getHeader("referer") == null) ? "NULL" : req.getHeader("referer");
-    String[] refererArr = referer.split("/");
-
-    if (referer.equals("NULL")) {
-      if ("true".equals(req.getParameter("csrf"))) {
-        Random random = new Random();
-        userSessionData.setValue("csrf-get-success", random.nextInt(65536));
-        response.put("success", true);
-        response.put("message", pluginMessages.getMessage("csrf-get-null-referer.success"));
-        response.put("flag", userSessionData.getValue("csrf-get-success"));
-      } else {
-        Random random = new Random();
-        userSessionData.setValue("csrf-get-success", random.nextInt(65536));
-        response.put("success", true);
-        response.put("message", pluginMessages.getMessage("csrf-get-other-referer.success"));
-        response.put("flag", userSessionData.getValue("csrf-get-success"));
-      }
-    } else if (refererArr[2].equals(host)) {
+    // This request changes state, so it is only carried out when it proves it was issued by
+    // WebGoat itself: the Origin (or Referer) has to match the host we are serving and the
+    // per-session anti-CSRF token has to be present. An absent Origin/Referer proves nothing and
+    // is rejected instead of trusted.
+    if (!CsrfProtection.isSameOrigin(req) || !CsrfProtection.hasValidToken(req)) {
       response.put("success", false);
-      response.put("message", "Appears the request came from the original host");
+      response.put("message", "Request rejected, it did not originate from WebGoat");
       response.put("flag", null);
-    } else {
-      Random random = new Random();
-      userSessionData.setValue("csrf-get-success", random.nextInt(65536));
-      response.put("success", true);
-      response.put("message", pluginMessages.getMessage("csrf-get-other-referer.success"));
-      response.put("flag", userSessionData.getValue("csrf-get-success"));
+      return response;
     }
+
+    Random random = new Random();
+    userSessionData.setValue("csrf-get-success", random.nextInt(65536));
+    response.put("success", true);
+    response.put("message", pluginMessages.getMessage("csrf-get-null-referer.success"));
+    response.put("flag", userSessionData.getValue("csrf-get-success"));
 
     return response;
   }

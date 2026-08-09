@@ -33,11 +33,13 @@ public class IDORViewOwnProfile {
         // going to use session auth to view this one
         String authUserId = (String) userSessionData.getValue("idor-authenticated-user-id");
         UserProfile userProfile = new UserProfile(authUserId);
-        details.put("userId", userProfile.getUserId());
-        details.put("name", userProfile.getName());
-        details.put("color", userProfile.getColor());
-        details.put("size", userProfile.getSize());
-        details.put("role", userProfile.getRole());
+        // only serialize the attributes the owner is entitled to see, the internal user id and the
+        // role are not disclosed to the client
+        details.putAll(userProfile.disclosedProfileToMap());
+        // self link, built from the indirect reference issued to this session instead of the
+        // internal user id
+        details.put(
+            "profileUrl", "WebGoat/IDOR/profile/" + ProfileReferences.current(userSessionData));
       } else {
         details.put(
             "error",

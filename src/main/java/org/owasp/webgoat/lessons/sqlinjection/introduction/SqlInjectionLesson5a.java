@@ -38,18 +38,22 @@ public class SqlInjectionLesson5a implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult completed(
       @RequestParam String account, @RequestParam String operator, @RequestParam String injection) {
-    return injectableQuery(account + " " + operator + " " + injection);
+    // The form always submits all three boxes, so an ordinary search arrives with two empty ones.
+    // The surrounding whitespace is trimmed off before the value is looked up, which is what the
+    // old string-built query got for free from the way the literal was compared.
+    return injectableQuery((account + " " + operator + " " + injection).trim());
   }
 
   protected AttackResult injectableQuery(String accountName) {
-    String query = "";
+    String query = "SELECT * FROM user_data WHERE first_name = 'John' and last_name = ?";
     try (Connection connection = dataSource.getConnection()) {
-      query =
-          "SELECT * FROM user_data WHERE first_name = 'John' and last_name = '" + accountName + "'";
-      try (Statement statement =
-          connection.createStatement(
-              ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
-        ResultSet results = statement.executeQuery(query);
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
+        // The account name is bound as a value, so quotes and operators inside it are matched
+        // literally and can no longer change the structure of the query.
+        statement.setString(1, accountName);
+        ResultSet results = statement.executeQuery();
 
         if ((results != null) && (results.first())) {
           ResultSetMetaData resultsMetaData = results.getMetaData();

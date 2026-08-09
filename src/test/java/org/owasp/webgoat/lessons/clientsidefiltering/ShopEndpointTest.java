@@ -58,9 +58,10 @@ public class ShopEndpointTest extends LessonTest {
   }
 
   @Test
-  public void fetchAllTheCouponsShouldContainGetItForFree() throws Exception {
+  public void fetchAllTheCouponsShouldNotContainGetItForFree() throws Exception {
     mockMvc
         .perform(MockMvcRequestBuilders.get("/clientSideFiltering/challenge-store/coupons"))
-        .andExpect(jsonPath("$.codes[3].code", is("get_it_for_free")));
+        .andExpect(jsonPath("$.codes.length()", is(3)))
+        .andExpect(jsonPath("$.codes[?(@.code == '" + SUPER_COUPON_CODE + "')]").isEmpty());
   }
 }

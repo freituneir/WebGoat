@@ -35,7 +35,6 @@ public class ForgedReviews implements AssignmentEndpoint {
 
   private static final Map<String, List<Review>> userReviews = new HashMap<>();
   private static final List<Review> REVIEWS = new ArrayList<>();
-  private static final String weakAntiCSRF = "2aa14227b9a13d0bede0388a7fba9aa9";
 
   static {
     REVIEWS.add(
@@ -72,9 +71,14 @@ public class ForgedReviews implements AssignmentEndpoint {
   public AttackResult createNewReview(
       String reviewText,
       Integer stars,
-      String validateReq,
       HttpServletRequest request,
       @CurrentUsername String username) {
+    // The review form carries the unpredictable token of this session in "validateReq"; a forged
+    // request cannot know it, so it is rejected before anything is stored.
+    if (!CsrfProtection.hasValidToken(request)) {
+      return failed(this).feedback("csrf-you-forgot-something").build();
+    }
+
     final String host = (request.getHeader("host") == null) ? "NULL" : request.getHeader("host");
     final String referer =
         (request.getHeader("referer") == null) ? "NULL" : request.getHeader("referer");
@@ -88,12 +92,8 @@ public class ForgedReviews implements AssignmentEndpoint {
     var reviews = userReviews.getOrDefault(username, new ArrayList<>());
     reviews.add(review);
     userReviews.put(username, reviews);
-    // short-circuit
-    if (validateReq == null || !validateReq.equals(weakAntiCSRF)) {
-      return failed(this).feedback("csrf-you-forgot-something").build();
-    }
     // we have the spoofed files
-    if (referer != "NULL" && refererArr[2].equals(host)) {
+    if (!"NULL".equals(referer) && refererArr.length > 2 && refererArr[2].equals(host)) {
       return failed(this).feedback("csrf-same-host").build();
     } else {
       return success(this)

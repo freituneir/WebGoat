@@ -26,7 +26,7 @@ class ProfileUploadTest extends LessonTest {
   }
 
   @Test
-  void solve() throws Exception {
+  void aTraversingNameIsReducedToItsFileNamePart() throws Exception {
     var profilePicture =
         new MockMultipartFile(
             "uploadedFile", "../picture.jpg", "text/plain", "an image".getBytes());
@@ -38,12 +38,17 @@ class ProfileUploadTest extends LessonTest {
                 .param("fullName", "../John Doe"))
         .andExpect(status().is(200))
         .andExpect(jsonPath("$.assignment", CoreMatchers.equalTo("ProfileUpload")))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(
+            jsonPath(
+                "$.feedback",
+                CoreMatchers.containsStringIgnoringCase(
+                    "PathTraversal\\" + File.separator + "test\\" + File.separator + "John Doe")))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
   @WithWebGoatUser
-  void attemptWithWrongDirectory() throws Exception {
+  void repeatedTraversalSequencesCannotEscapeTheUploadDirectory() throws Exception {
     var profilePicture =
         new MockMultipartFile(
             "uploadedFile", "../picture.jpg", "text/plain", "an image".getBytes());
@@ -55,13 +60,12 @@ class ProfileUploadTest extends LessonTest {
                 .param("fullName", "../../" + "test"))
         .andExpect(status().is(200))
         .andExpect(jsonPath("$.assignment", CoreMatchers.equalTo("ProfileUpload")))
-        .andExpect(jsonPath("$.feedback", CoreMatchers.containsString("Nice try")))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
   @WithWebGoatUser
-  void shouldNotOverrideExistingFile() throws Exception {
+  void aRelativeNameIsWrittenInsideTheUsersOwnDirectory() throws Exception {
     var profilePicture =
         new MockMultipartFile("uploadedFile", "picture.jpg", "text/plain", "an image".getBytes());
     mockMvc
@@ -69,13 +73,8 @@ class ProfileUploadTest extends LessonTest {
             MockMvcRequestBuilders.multipart("/PathTraversal/profile-upload")
                 .file(profilePicture)
                 .param("fullName", ".." + File.separator + "test"))
-        .andExpect(
-            jsonPath(
-                "$.output",
-                CoreMatchers.anyOf(
-                    CoreMatchers.containsString("Is a directory"),
-                    CoreMatchers.containsString("..\\\\" + "test"))))
-        .andExpect(status().is(200));
+        .andExpect(status().is(200))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test

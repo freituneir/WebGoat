@@ -19,10 +19,21 @@ class DisplayUserTest {
   }
 
   @Test
-  void testDisplayUserHash() {
+  void theHashCannotBeRecomputedFromAConstantInTheSource() {
     DisplayUser displayUser =
         new DisplayUser(new User("user1", "password1", false), PASSWORD_SALT_SIMPLE);
+
+    // The value the old, source-derived salt produced for these credentials.
     Assertions.assertThat(displayUser.getUserHash())
-        .isEqualTo("cplTjehjI/e5ajqTxWaXhU5NW9UotJfXj+gcbPvfWWc=");
+        .isNotBlank()
+        .isNotEqualTo("cplTjehjI/e5ajqTxWaXhU5NW9UotJfXj+gcbPvfWWc=");
+  }
+
+  @Test
+  void everyUserGetsItsOwnSalt() {
+    var first = new DisplayUser(new User("user1", "samepassword", false), PASSWORD_SALT_SIMPLE);
+    var second = new DisplayUser(new User("user2", "samepassword", false), PASSWORD_SALT_SIMPLE);
+
+    Assertions.assertThat(first.getUserHash()).isNotEqualTo(second.getUserHash());
   }
 }

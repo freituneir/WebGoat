@@ -4,7 +4,6 @@
  */
 package org.owasp.webgoat.lessons.missingac;
 
-import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,21 +22,16 @@ class MissingFunctionACUsersTest extends LessonTest {
   }
 
   @Test
-  void getUsers() throws Exception {
+  void listingUsersRequiresTheAdminRole() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.get("/access-control/users")
                 .header("Content-type", "application/json"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].username", CoreMatchers.is("Tom")))
-        .andExpect(
-            jsonPath(
-                "$[0].userHash", CoreMatchers.is("Mydnhcy00j2b0m6SjmPz6PUxF9WIeO7tzm665GiZWCo=")))
-        .andExpect(jsonPath("$[0].admin", CoreMatchers.is(false)));
+        .andExpect(status().isForbidden());
   }
 
   @Test
-  void addUser() throws Exception {
+  void aClientCannotGrantItselfTheAdminRole() throws Exception {
     var user =
         """
         {"username":"newUser","password":"newUser12","admin": "true"}
@@ -47,13 +41,8 @@ class MissingFunctionACUsersTest extends LessonTest {
             MockMvcRequestBuilders.post("/access-control/users")
                 .header("Content-type", "application/json")
                 .content(user))
-        .andExpect(status().isOk());
-
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.get("/access-control/users")
-                .header("Content-type", "application/json"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.size()", is(4)));
+        .andExpect(jsonPath("$.username", CoreMatchers.is("newUser")))
+        .andExpect(jsonPath("$.admin", CoreMatchers.is(false)));
   }
 }

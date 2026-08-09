@@ -14,7 +14,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 class MissingFunctionACHiddenMenusTest extends LessonTest {
 
   @Test
-  void HiddenMenusSuccess() throws Exception {
+  void knowingTheHiddenMenuItemsIsNotEnoughForANonAdmin() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/access-control/hidden-menu")
@@ -23,8 +23,8 @@ class MissingFunctionACHiddenMenusTest extends LessonTest {
         .andExpect(
             jsonPath(
                 "$.feedback",
-                CoreMatchers.is(messages.getMessage("access-control.hidden-menus.success"))))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+                CoreMatchers.is(messages.getMessage("access-control.hidden-menus.failure"))))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
@@ -34,10 +34,6 @@ class MissingFunctionACHiddenMenusTest extends LessonTest {
             MockMvcRequestBuilders.post("/access-control/hidden-menu")
                 .param("hiddenMenu1", "Config")
                 .param("hiddenMenu2", "Users"))
-        .andExpect(
-            jsonPath(
-                "$.feedback",
-                CoreMatchers.is(messages.getMessage("access-control.hidden-menus.close"))))
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 

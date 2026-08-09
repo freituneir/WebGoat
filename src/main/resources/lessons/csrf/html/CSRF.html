@@ -3,6 +3,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
 <div class="lesson-page-wrapper">
+    <script th:src="@{/lesson_js/csrf-token.js}" language="JavaScript"></script>
     <div class="adoc-content" th:replace="~{doc:lessons/csrf/documentation/CSRF_intro.adoc}"></div>
 </div>
 
@@ -19,6 +20,7 @@
           successCallback=""
           th:action="@{/csrf/basic-get-flag}">
         <input name="csrf" type="hidden" value="false"/>
+        <input name="validateReq" type="hidden" value=""/>
         <input type="submit" name="submit"/>
 
     </form>
@@ -97,7 +99,7 @@
                                 <input class="form-control" id="reviewText" name="reviewText" placeholder="Add a Review"
                                        type="text"/>
                                 <input class="form-control" id="reviewStars" name="stars" type="text"/>
-                                <input type="hidden" name="validateReq" value="2aa14227b9a13d0bede0388a7fba9aa9"/>
+                                <input type="hidden" name="validateReq" value=""/>
                                 <input type="submit" name="submit" value="Submit review"/>
                             </form>
                             <div class="attack-feedback"></div>
@@ -146,6 +148,7 @@
                             <form class="attack-form" accept-charset="UNKNOWN" id="csrf-feedback"
                                   method="POST"
                                   prepareData="feedback"
+                                  additionalHeaders="addCsrfToken"
                                   th:action="@{/csrf/feedback/message}"
                                   contentType="application/json">
                                 <div class="row">
@@ -236,6 +239,7 @@
         </div>
         <form class="attack-form" accept-charset="UNKNOWN" id="confirm-flag-login"
               method="POST" name="form2"
+              additionalHeaders="addCsrfToken"
               th:action="@{/csrf/login}">
 
             Press the button below when your are logged in as the other user<br/>

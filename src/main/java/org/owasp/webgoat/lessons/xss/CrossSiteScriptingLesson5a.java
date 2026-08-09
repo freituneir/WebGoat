@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.HtmlUtils;
 
 @RestController
 @AssignmentHints(
@@ -60,9 +61,12 @@ public class CrossSiteScriptingLesson5a implements AssignmentEndpoint {
             + QTY4.intValue() * 299.99;
 
     userSessionData.setValue("xss-reflected1-complete", "false");
+    // The credit card field is reflected into the HTML of the confirmation page, so it is
+    // HTML-encoded here and therefore rendered as text instead of as markup.
+    String reflectedField1 = HtmlUtils.htmlEscape(field1);
     StringBuilder cart = new StringBuilder();
     cart.append("Thank you for shopping at WebGoat. <br />Your support is appreciated<hr />");
-    cart.append("<p>We have charged credit card:" + field1 + "<br />");
+    cart.append("<p>We have charged credit card:" + reflectedField1 + "<br />");
     cart.append("                             ------------------- <br />");
     cart.append("                               $" + totalSale);
 
@@ -71,22 +75,19 @@ public class CrossSiteScriptingLesson5a implements AssignmentEndpoint {
       userSessionData.setValue("xss-reflected1-complete", "false");
     }
 
-    if (XSS_PATTERN.test(field1)) {
+    // The assignment is solved when the page which is sent back really contains an executable
+    // script, so the check is done on the reflected response and not on the raw request parameter.
+    String response = cart.toString();
+    if (XSS_PATTERN.test(response)) {
       userSessionData.setValue("xss-reflected-5a-complete", "true");
-      if (field1.toLowerCase().contains("console.log")) {
-        return success(this)
-            .feedback("xss-reflected-5a-success-console")
-            .output(cart.toString())
-            .build();
+      if (response.toLowerCase().contains("console.log")) {
+        return success(this).feedback("xss-reflected-5a-success-console").output(response).build();
       } else {
-        return success(this)
-            .feedback("xss-reflected-5a-success-alert")
-            .output(cart.toString())
-            .build();
+        return success(this).feedback("xss-reflected-5a-success-alert").output(response).build();
       }
     } else {
       userSessionData.setValue("xss-reflected1-complete", "false");
-      return failed(this).feedback("xss-reflected-5a-failure").output(cart.toString()).build();
+      return failed(this).feedback("xss-reflected-5a-failure").output(response).build();
     }
   }
 }

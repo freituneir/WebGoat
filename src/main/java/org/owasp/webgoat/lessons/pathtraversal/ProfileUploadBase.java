@@ -6,7 +6,6 @@ package org.owasp.webgoat.lessons.pathtraversal;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,13 +47,23 @@ public class ProfileUploadBase implements AssignmentEndpoint {
     File uploadDirectory = cleanupAndCreateDirectoryForUser(username);
 
     try {
-      var uploadedFile = new File(uploadDirectory, fullName);
+      // Never trust the name supplied by the client: keep the file name part only and verify the
+      // canonical location of the resulting file is still inside the upload directory.
+      var fileName = FilenameUtils.getName(fullName);
+      if (StringUtils.isEmpty(fileName)) {
+        return failed(this).feedback("path-traversal-profile-empty-name").build();
+      }
+      var uploadedFile = new File(uploadDirectory, fileName);
+      if (!isInside(uploadDirectory, uploadedFile)) {
+        return failed(this)
+            .attemptWasMade()
+            .feedback("path-traversal-profile-attempt")
+            .feedbackArgs(uploadDirectory.getCanonicalPath())
+            .build();
+      }
       uploadedFile.createNewFile();
       FileCopyUtils.copy(file.getBytes(), uploadedFile);
 
-      if (attemptWasMade(uploadDirectory, uploadedFile)) {
-        return solvedIt(uploadedFile);
-      }
       return informationMessage(this)
           .feedback("path-traversal-profile-updated")
           .feedbackArgs(uploadedFile.getAbsoluteFile())
@@ -65,6 +74,10 @@ public class ProfileUploadBase implements AssignmentEndpoint {
     }
   }
 
+  private boolean isInside(File directory, File file) throws IOException {
+    return file.getCanonicalFile().toPath().startsWith(directory.getCanonicalFile().toPath());
+  }
+
   @SneakyThrows
   protected File cleanupAndCreateDirectoryForUser(String username) {
     var uploadDirectory = new File(this.webGoatHomeDirectory, "/PathTraversal/" + username);
@@ -73,24 +86,6 @@ public class ProfileUploadBase implements AssignmentEndpoint {
     }
     Files.createDirectories(uploadDirectory.toPath());
     return uploadDirectory;
-  }
-
-  private boolean attemptWasMade(File expectedUploadDirectory, File uploadedFile)
-      throws IOException {
-    return !expectedUploadDirectory
-        .getCanonicalPath()
-        .equals(uploadedFile.getParentFile().getCanonicalPath());
-  }
-
-  private AttackResult solvedIt(File uploadedFile) throws IOException {
-    if (uploadedFile.getCanonicalFile().getParentFile().getName().endsWith("PathTraversal")) {
-      return success(this).build();
-    }
-    return failed(this)
-        .attemptWasMade()
-        .feedback("path-traversal-profile-attempt")
-        .feedbackArgs(uploadedFile.getCanonicalPath())
-        .build();
   }
 
   public ResponseEntity<?> getProfilePicture(@CurrentUsername String username) {

@@ -4,7 +4,8 @@ webgoat.customjs.idorViewProfile = function(data) {
     webgoat.customjs.jquery('#idor-profile').html(
         'name:' + data.name + '<br/>'+
         'color:' + data.color + '<br/>'+
-        'size:' + data.size + '<br/>'
+        'size:' + data.size + '<br/>'+
+        'profileUrl:' + data.profileUrl + '<br/>'
     );
 }
 

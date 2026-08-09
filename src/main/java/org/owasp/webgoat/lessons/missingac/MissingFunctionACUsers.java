@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,7 +32,10 @@ public class MissingFunctionACUsers {
   private final MissingAccessControlUserRepository userRepository;
 
   @GetMapping(path = {"access-control/users"})
-  public ModelAndView listUsers() {
+  public ModelAndView listUsers(@CurrentUsername String username) {
+    if (!isAdmin(username)) {
+      throw new AccessDeniedException("Listing users requires the admin role");
+    }
 
     ModelAndView model = new ModelAndView();
     model.setViewName("list_users");
@@ -51,7 +55,11 @@ public class MissingFunctionACUsers {
       path = {"access-control/users"},
       consumes = "application/json")
   @ResponseBody
-  public ResponseEntity<List<DisplayUser>> usersService() {
+  public ResponseEntity<List<DisplayUser>> usersService(@CurrentUsername String username) {
+    // listing all users is an administrative function, so authorize it on the server
+    if (!isAdmin(username)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     return ResponseEntity.ok(
         userRepository.findAllUsers().stream()
             .map(user -> new DisplayUser(user, PASSWORD_SALT_SIMPLE))
@@ -63,14 +71,13 @@ public class MissingFunctionACUsers {
       consumes = "application/json")
   @ResponseBody
   public ResponseEntity<List<DisplayUser>> usersFixed(@CurrentUsername String username) {
-    var currentUser = userRepository.findByUsername(username);
-    if (currentUser != null && currentUser.isAdmin()) {
-      return ResponseEntity.ok(
-          userRepository.findAllUsers().stream()
-              .map(user -> new DisplayUser(user, PASSWORD_SALT_ADMIN))
-              .collect(Collectors.toList()));
+    if (!isAdmin(username)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
-    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    return ResponseEntity.ok(
+        userRepository.findAllUsers().stream()
+            .map(user -> new DisplayUser(user, PASSWORD_SALT_ADMIN))
+            .collect(Collectors.toList()));
   }
 
   @PostMapping(
@@ -80,8 +87,11 @@ public class MissingFunctionACUsers {
   @ResponseBody
   public User addUser(@RequestBody User newUser) {
     try {
-      userRepository.save(newUser);
-      return newUser;
+      // never bind a privilege attribute from the request body: a client cannot assign itself a
+      // role, new users are always created without the admin role
+      var user = new User(newUser.getUsername(), newUser.getPassword(), false);
+      userRepository.save(user);
+      return user;
     } catch (Exception ex) {
       log.error("Error creating new User", ex);
       return null;
@@ -91,5 +101,10 @@ public class MissingFunctionACUsers {
     // "application/json", produces = "application/json")
     // TODO implement delete method with id param and authorization
 
+  }
+
+  private boolean isAdmin(String username) {
+    var currentUser = userRepository.findByUsername(username);
+    return currentUser != null && currentUser.isAdmin();
   }
 }

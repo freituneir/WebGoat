@@ -4,10 +4,10 @@
  */
 package org.owasp.webgoat.lessons.hijacksession.cas;
 
-import java.time.Instant;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoublePredicate;
 import java.util.function.Supplier;
@@ -26,12 +26,26 @@ import org.springframework.web.context.annotation.ApplicationScope;
 public class HijackSessionAuthenticationProvider implements AuthenticationProvider<Authentication> {
 
   private Queue<String> sessions = new LinkedList<>();
-  private static long id = new Random().nextLong() & Long.MAX_VALUE;
   protected static final int MAX_SESSIONS = 50;
 
+  /** 128 bits: enough that guessing a live identifier is not a practical attack. */
+  private static final int SESSION_ID_BYTES = 16;
+
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
   private static final DoublePredicate PROBABILITY_DOUBLE_PREDICATE = pr -> pr < 0.75;
+
+  /**
+   * Session identifiers are drawn from a cryptographically secure generator. A counter combined
+   * with a timestamp is derivable: anyone holding one identifier can enumerate the neighbouring
+   * values and land on somebody else's authenticated session.
+   */
   private static final Supplier<String> GENERATE_SESSION_ID =
-      () -> ++id + "-" + Instant.now().toEpochMilli();
+      () -> {
+        byte[] randomBytes = new byte[SESSION_ID_BYTES];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+      };
   public static final Supplier<Authentication> AUTHENTICATION_SUPPLIER =
       () -> Authentication.builder().id(GENERATE_SESSION_ID.get()).build();
 
