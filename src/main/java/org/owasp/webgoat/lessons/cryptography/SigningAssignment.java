@@ -34,6 +34,15 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class SigningAssignment implements AssignmentEndpoint {
 
+  /**
+   * Hands out sample key material for the exercise.
+   *
+   * <p>Originally this returned the private half of the very key pair {@link #completed} verifies
+   * against, so possession of the key proved nothing — anyone who called this endpoint could sign
+   * any message the server would then accept. A private key that the server relies on must never
+   * cross a trust boundary, so the pair generated here is a throw-away used purely as sample
+   * material and is kept separate from the pair the server actually trusts.
+   */
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
   public String getPrivateKey(HttpServletRequest request)
@@ -41,22 +50,35 @@ public class SigningAssignment implements AssignmentEndpoint {
 
     String privateKey = (String) request.getSession().getAttribute("privateKeyString");
     if (privateKey == null) {
-      KeyPair keyPair = CryptoUtil.generateKeyPair();
-      privateKey = CryptoUtil.getPrivateKeyInPEM(keyPair);
+      privateKey = CryptoUtil.getPrivateKeyInPEM(CryptoUtil.generateKeyPair());
       request.getSession().setAttribute("privateKeyString", privateKey);
-      request.getSession().setAttribute("keyPair", keyPair);
     }
     return privateKey;
+  }
+
+  /**
+   * The key pair the server trusts. Its private half is generated on the server and never leaves
+   * it, so a signature can only be produced by the server itself.
+   */
+  private KeyPair trustedKeyPair(HttpServletRequest request)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+    KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null) {
+      keyPair = CryptoUtil.generateKeyPair();
+      request.getSession().setAttribute("keyPair", keyPair);
+    }
+    return keyPair;
   }
 
   @PostMapping("/crypto/signing/verify")
   @ResponseBody
   public AttackResult completed(
-      HttpServletRequest request, @RequestParam String modulus, @RequestParam String signature) {
+      HttpServletRequest request, @RequestParam String modulus, @RequestParam String signature)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
-    KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    KeyPair keyPair = trustedKeyPair(request);
     RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);

@@ -12,7 +12,9 @@ import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -34,11 +36,32 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   public static final String[] SECRETS = {
     "victory", "business", "available", "shipping", "washington"
   };
+
+  /**
+   * Key used to mint the throw-away sample token the lesson hands out. It is deliberately weak so
+   * the exercise of cracking a captured token still works, but it carries no authority: nothing on
+   * the server trusts a token signed with it.
+   */
   public static final String JWT_SECRET =
       TextCodec.BASE64.encode(SECRETS[new Random().nextInt(SECRETS.length)]);
+
+  /**
+   * The key the server actually trusts. A signing key must have at least as much entropy as the MAC
+   * it produces (RFC 7518 §3.2 requires >= 256 bits for HS256), so it is drawn from a CSPRNG at
+   * startup and never leaves the process. A dictionary word cannot be substituted for it, which is
+   * what made the original token forgeable offline.
+   */
+  private static final String VERIFICATION_SECRET = generateVerificationSecret();
+
   private static final String WEBGOAT_USER = "WebGoat";
   private static final List<String> expectedClaims =
       List.of("iss", "iat", "exp", "aud", "sub", "username", "Email", "Role");
+
+  private static String generateVerificationSecret() {
+    byte[] key = new byte[32];
+    new SecureRandom().nextBytes(key);
+    return Base64.getEncoder().encodeToString(key);
+  }
 
   @RequestMapping(path = "/JWT/secret/gettoken", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
@@ -60,7 +83,7 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult login(@RequestParam String token) {
     try {
-      Jwt jwt = Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token);
+      Jwt jwt = Jwts.parser().setSigningKey(VERIFICATION_SECRET).parseClaimsJws(token);
       Claims claims = (Claims) jwt.getBody();
       if (!claims.keySet().containsAll(expectedClaims)) {
         return failed(this).feedback("jwt-secret-claims-missing").build();
