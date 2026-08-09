@@ -34,6 +34,13 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class SigningAssignment implements AssignmentEndpoint {
 
+  /*
+   * This exercise deliberately hands the visitor a key to sign with - that is the exercise. The
+   * key pair is per session, so one visitor's key is never another's, and it is generated with a
+   * fixed public exponent: see CryptoUtil, where the exponent used to be drawn at random from the
+   * small Fermat primes. With e=3 a PKCS#1 v1.5 signature can be forged outright, so verification
+   * would accept a signature produced without ever holding the private key.
+   */
   @RequestMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_HTML_VALUE)
   @ResponseBody
   public String getPrivateKey(HttpServletRequest request)
@@ -57,6 +64,9 @@ public class SigningAssignment implements AssignmentEndpoint {
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
     KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
+    if (keyPair == null) {
+      return failed(this).feedback("crypto-signing.modulusnotok").build();
+    }
     RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);
