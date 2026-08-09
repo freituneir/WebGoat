@@ -19,8 +19,10 @@ import java.util.ArrayList;
 import java.util.TimeZone;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -53,13 +55,18 @@ public class FileServer {
   @Value("${server.port}")
   private int port;
 
+  /**
+   * The absolute path the uploads live under is server-side detail. Publishing it names the account
+   * the process runs as and gives anything that can influence a path elsewhere a target to aim at,
+   * so the location is no longer returned.
+   */
   @RequestMapping(
       path = "/file-server-location",
       consumes = ALL_VALUE,
       produces = MediaType.TEXT_PLAIN_VALUE)
   @ResponseBody
-  public String getFileLocation() {
-    return fileLocation;
+  public ResponseEntity<Void> getFileLocation() {
+    return ResponseEntity.notFound().build();
   }
 
   @PostMapping(value = "/fileupload")
@@ -69,18 +76,35 @@ public class FileServer {
     var username = authentication.getName();
     var destinationDir = new File(fileLocation, username);
     destinationDir.mkdirs();
+    var fileName = sanitizedFileName(multipartFile.getOriginalFilename());
     // DO NOT use multipartFile.transferTo(), see
     // https://stackoverflow.com/questions/60336929/java-nio-file-nosuchfileexception-when-file-transferto-is-called
     try (InputStream is = multipartFile.getInputStream()) {
-      var destinationFile = destinationDir.toPath().resolve(multipartFile.getOriginalFilename());
+      var uploadRoot = destinationDir.toPath().toAbsolutePath().normalize();
+      var destinationFile = uploadRoot.resolve(fileName).normalize();
+      if (!destinationFile.startsWith(uploadRoot)) {
+        throw new IOException("Invalid file name: " + multipartFile.getOriginalFilename());
+      }
       Files.deleteIfExists(destinationFile);
       Files.copy(is, destinationFile);
     }
-    log.debug("File saved to {}", new File(destinationDir, multipartFile.getOriginalFilename()));
+    log.debug("File saved to {}", new File(destinationDir, fileName));
 
     return new ModelAndView(
         new RedirectView("files", true),
         new ModelMap().addAttribute("uploadSuccess", "File uploaded successful"));
+  }
+
+  /**
+   * Reduces a client-supplied multipart filename to its last path segment, so any directory
+   * component it carried cannot influence where the upload is written.
+   */
+  private static String sanitizedFileName(String originalFilename) throws IOException {
+    var name = FilenameUtils.getName(originalFilename == null ? "" : originalFilename);
+    if (name.isBlank() || ".".equals(name) || "..".equals(name)) {
+      throw new IOException("Invalid file name: " + originalFilename);
+    }
+    return name;
   }
 
   @GetMapping(value = "/files")
