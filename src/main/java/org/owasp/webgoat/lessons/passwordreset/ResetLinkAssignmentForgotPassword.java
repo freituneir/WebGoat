@@ -27,11 +27,15 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
 
   private final RestTemplate restTemplate;
   private final String webWolfMailURL;
+  private final String webGoatUrl;
 
   public ResetLinkAssignmentForgotPassword(
-      RestTemplate restTemplate, @Value("${webwolf.mail.url}") String webWolfMailURL) {
+      RestTemplate restTemplate,
+      @Value("${webwolf.mail.url}") String webWolfMailURL,
+      @Value("${webgoat.url}") String webGoatUrl) {
     this.restTemplate = restTemplate;
     this.webWolfMailURL = webWolfMailURL;
+    this.webGoatUrl = webGoatUrl;
   }
 
   @PostMapping("/PasswordReset/ForgotPassword/create-password-reset-link")
@@ -41,9 +45,9 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     ResetLinkAssignment.resetLinks.add(resetLink);
     ResetLinkAssignment.resetLinkOwners.put(resetLink, email);
     try {
-      // Only a notification goes out. The token stays here, so neither the Host header (which
-      // the client writes) nor access to the mailbox yields a link that works.
-      sendMailToUser(email);
+      // The address in the link comes from configuration, never from the Host header the
+      // requester wrote, so a spoofed header cannot point another account's link somewhere else.
+      sendMailToUser(email, resetLink);
     } catch (Exception e) {
       return informationMessage(this).output("E-mail can't be send. please try again.").build();
     }
@@ -52,13 +56,13 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  private void sendMailToUser(String email) {
+  private void sendMailToUser(String email, String resetLink) {
     int index = email.indexOf("@");
     String username = email.substring(0, index == -1 ? email.length() : index);
     PasswordResetEmail mail =
         PasswordResetEmail.builder()
             .title("Password reset requested")
-            .contents(ResetLinkAssignment.TEMPLATE)
+            .contents(ResetLinkAssignment.TEMPLATE.formatted(webGoatUrl, resetLink))
             .sender("password-reset@webgoat-cloud.net")
             .recipient(username)
             .build();

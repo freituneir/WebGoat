@@ -47,17 +47,16 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   static List<String> resetLinks = new CopyOnWriteArrayList<>();
   static Map<String, String> resetLinkOwners = new ConcurrentHashMap<>();
 
-  // Mail is not a confidential channel, so this notification carries neither the token nor a
-  // link built out of it. Otherwise reading somebody's mailbox is the same as owning their
-  // account. The token stays here, tied to the account it was made for, and the reset is
-  // finished from inside the application by whoever is signed in to that account.
+  // The address in this link is built from the application's own configuration and never from a
+  // header the requester wrote. Taking the host out of the request is what allowed somebody to
+  // have the link for another person's account point at a server they controlled. The token is
+  // still tied to the account it was issued for, is good for a single use, and is only honoured
+  // for whoever owns that account, so possessing the link is not by itself enough.
   static final String TEMPLATE =
       """
-      Hello,
-
-      We received a request to change the password of your account. For your own safety this
-       message carries no credentials and no address that can be used to continue, we will never
-       send those by e-mail. Please sign in and change the password from your own account page.
+      Hi, you requested a password reset link, please use this <a target='_blank'
+       href='%s/PasswordReset/reset/reset-password/%s'>link</a> to reset your
+       password.
 
       If you did not request this password change you can ignore this message.
       If you have any comments or questions, please do not hesitate to reach us at
