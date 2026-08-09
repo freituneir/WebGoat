@@ -29,16 +29,15 @@ public class IDORViewOwnProfile {
   public Map<String, Object> invoke() {
     Map<String, Object> details = new HashMap<>();
     try {
-      Object authenticatedAs = userSessionData.getValue("idor-authenticated-as");
-      if (authenticatedAs != null && authenticatedAs.equals("tom")) {
+      if (userSessionData.getValue("idor-authenticated-as").equals("tom")) {
         // going to use session auth to view this one
         String authUserId = (String) userSessionData.getValue("idor-authenticated-user-id");
         UserProfile userProfile = new UserProfile(authUserId);
-        // the internal id and the role stay here; the response carries only the attributes
-        // that are actually part of the profile
+        details.put("userId", userProfile.getUserId());
         details.put("name", userProfile.getName());
         details.put("color", userProfile.getColor());
         details.put("size", userProfile.getSize());
+        details.put("role", userProfile.getRole());
       } else {
         details.put(
             "error",
