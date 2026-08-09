@@ -16,12 +16,13 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -46,6 +47,7 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
   // Not a credential that can be read out of the repository. Tests and the lesson pick it up
   // from the running instance, so nothing reusable is published.
   public static final String PASSWORD = randomLoginPassword();
+  private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(10);
   // 512 random bits, drawn at startup. As a constant in this file it was all anybody needed to
   // sign a token of their own.
   private static final String JWT_PASSWORD = randomSigningKey();
@@ -84,10 +86,16 @@ public class JWTRefreshEndpoint implements AssignmentEndpoint {
 
   private Map<String, Object> createNewTokens(String user) {
     Map<String, Object> claims = Map.of("admin", "false", "user", user);
+    // setClaims replaces the whole claim map, so it has to come before iat/exp are stamped -
+    // otherwise both are silently dropped. The old code also read
+    // "now + TimeUnit.DAYS.toDays(10)", which is now + 10 milliseconds, and never set an
+    // expiration at all, so an access token stayed valid forever.
+    Instant now = Instant.now();
     String token =
         Jwts.builder()
-            .setIssuedAt(new Date(System.currentTimeMillis() + TimeUnit.DAYS.toDays(10)))
             .setClaims(claims)
+            .setIssuedAt(Date.from(now))
+            .setExpiration(Date.from(now.plus(ACCESS_TOKEN_TTL)))
             .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
             .compact();
     Map<String, Object> tokenJson = new HashMap<>();

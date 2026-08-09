@@ -29,7 +29,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.HtmlUtils;
 
 @RestController
 public class StoredXssComments implements AssignmentEndpoint {
@@ -45,7 +44,7 @@ public class StoredXssComments implements AssignmentEndpoint {
         new Comment(
             "secUriTy",
             LocalDateTime.now().format(fmt),
-            escapeHtml("<script>console.warn('unit test me')</script>Comment for Unit Testing")));
+            "<script>console.warn('unit test me')</script>Comment for Unit Testing"));
     comments.add(new Comment("webgoat", LocalDateTime.now().format(fmt), "This comment is safe"));
     comments.add(new Comment("guest", LocalDateTime.now().format(fmt), "This one is safe too."));
     comments.add(
@@ -79,8 +78,7 @@ public class StoredXssComments implements AssignmentEndpoint {
 
     List<Comment> comments = userComments.getOrDefault(username, new ArrayList<>());
     comment.setDateTime(LocalDateTime.now().format(fmt));
-    comment.setUser(escapeHtml(username));
-    comment.setText(escapeHtml(comment.getText()));
+    comment.setUser(username);
 
     comments.add(comment);
     userComments.put(username, comments);
@@ -101,11 +99,4 @@ public class StoredXssComments implements AssignmentEndpoint {
     }
   }
 
-  /**
-   * The list of comments is rendered as HTML, so anything a user typed is stored encoded. Markup
-   * inside a comment ends up on screen as text rather than running in the next reader's browser.
-   */
-  private static String escapeHtml(String text) {
-    return text == null ? "" : HtmlUtils.htmlEscape(text);
-  }
 }

@@ -15,29 +15,33 @@ $(document).ready(function () {
         )
     })
 
-    var html = '<li class="comment">' +
-        '<div class="pull-left">' +
-        '<img class="avatar" src="images/avatar1.png" alt="avatar"/>' +
-        '</div>' +
-        '<div class="comment-body">' +
-        '<div class="comment-heading">' +
-        '<h4 class="user">USER</h4>' +
-        '<h5 class="time">DATETIME</h5>' +
-        '</div>' +
-        '<p>COMMENT</p>' +
-        '</div>' +
-        '</li>';
-
     getChallenges();
+
+    // Comments are built with DOM APIs and .text(), so the stored value is set as character data
+    // and is never parsed as markup. Splicing it into an HTML string and calling .append() made
+    // this the sink: whatever a previous visitor stored ran in every later viewer's browser.
+    // Encoding belongs here, at the point of output, in the context the value is used - not on
+    // the way into the store, which leaves the sink one refactor away from being live again.
+    function renderComment(comment) {
+        var avatar = $('<div class="pull-left">').append(
+            $('<img class="avatar" src="images/avatar1.png" alt="avatar"/>'));
+
+        var heading = $('<div class="comment-heading">')
+            .append($('<h4 class="user">').text(comment.user))
+            .append($('<h5 class="time">').text(comment.dateTime));
+
+        var body = $('<div class="comment-body">')
+            .append(heading)
+            .append($('<p>').text(comment.text));
+
+        return $('<li class="comment">').append(avatar).append(body);
+    }
 
     function getChallenges() {
         $("#list").empty();
         $.get('CrossSiteScriptingStored/stored-xss', function (result, status) {
             for (var i = 0; i < result.length; i++) {
-                var comment = html.replace('USER', result[i].user);
-                comment = comment.replace('DATETIME', result[i].dateTime);
-                comment = comment.replace('COMMENT', result[i].text);
-                $("#list").append(comment);
+                $("#list").append(renderComment(result[i]));
             }
 
         });

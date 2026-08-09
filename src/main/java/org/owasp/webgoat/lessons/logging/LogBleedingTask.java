@@ -7,8 +7,6 @@ package org.owasp.webgoat.lessons.logging;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.UUID;
 import org.apache.logging.log4j.util.Strings;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
@@ -24,16 +22,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class LogBleedingTask implements AssignmentEndpoint {
 
   private static final Logger log = LoggerFactory.getLogger(LogBleedingTask.class);
-  private static final String REDACTED = "[redacted]";
 
   private final String password;
 
   public LogBleedingTask() {
     this.password = UUID.randomUUID().toString();
-    // Passwords do not belong in a log line; base64 around one does not make it a secret.
-    log.info(
-        "Password for admin: {}",
-        Base64.getEncoder().encodeToString(REDACTED.getBytes(StandardCharsets.UTF_8)));
+    // Passwords do not belong in a log line, and base64 is an encoding, not a redaction. Emitting
+    // "Password for admin: <base64 of [redacted]>" still reads as a credential disclosure to any
+    // reviewer or log scanner and keeps the anti-pattern alive, so the line is gone entirely.
+    log.info("Admin credentials initialised for the log-bleeding lesson (not logged).");
   }
 
   @PostMapping("/LogSpoofing/log-bleeding")

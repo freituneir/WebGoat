@@ -47,15 +47,19 @@ public class SqlInjectionLesson10 implements AssignmentEndpoint {
 
   protected AttackResult injectableQueryAvailability(String action) {
     StringBuilder output = new StringBuilder();
-    // The search term is bound; the wildcards belong to the value, not to the statement.
-    String query = "SELECT * FROM access_log WHERE action LIKE ?";
+    // The search term is bound; the wildcards belong to the value, not to the statement. Binding
+    // alone still lets the caller steer the pattern, because % and _ are LIKE metacharacters on
+    // the value side - a bare % dumps the whole table. They are escaped, and the escape character
+    // is declared, so the term matches literally.
+    String query = "SELECT * FROM access_log WHERE action LIKE ? ESCAPE '\\'";
 
     try (Connection connection = dataSource.getConnection()) {
       try {
         PreparedStatement statement =
             connection.prepareStatement(
                 query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        statement.setString(1, "%" + action + "%");
+        String term = action.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        statement.setString(1, "%" + term + "%");
         ResultSet results = statement.executeQuery();
 
         if (results.getStatement() != null) {
