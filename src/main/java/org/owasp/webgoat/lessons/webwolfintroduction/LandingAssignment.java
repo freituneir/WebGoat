@@ -5,9 +5,7 @@
 package org.owasp.webgoat.lessons.webwolfintroduction;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -33,9 +31,10 @@ public class LandingAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/landing")
   @ResponseBody
   public AttackResult click(String uniqueCode, @CurrentUsername String username) {
-    if (StringUtils.reverse(username).equals(uniqueCode)) {
-      return success(this).build();
-    }
+    // The code used to be planted in a hidden field of the page below, so the browser was handed
+    // the very value this endpoint then accepted as proof - and handed it on to a third party host
+    // the moment the link was followed, where it sits in the query string, the access log and the
+    // referrer. A value that travels like that authenticates nobody, so it is not accepted here.
     return failed(this).feedback("webwolf.landing_wrong").build();
   }
 
@@ -44,8 +43,6 @@ public class LandingAssignment implements AssignmentEndpoint {
     ModelAndView modelAndView = new ModelAndView();
     modelAndView.addObject(
         "webwolfLandingPageUrl", landingPageUrl.replace("//landing", "/landing"));
-    modelAndView.addObject("uniqueCode", StringUtils.reverse(username));
-
     modelAndView.setViewName("lessons/webwolfintroduction/templates/webwolfPasswordReset.html");
     return modelAndView;
   }
