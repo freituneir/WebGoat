@@ -6,11 +6,14 @@ package org.owasp.webgoat.webwolf.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.actuate.web.exchanges.HttpExchange;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -69,13 +72,61 @@ public class Requests {
     String path = req.getUri().getPath();
     String query = req.getUri().getQuery();
 
-    if (path.contains("/files")) {
+    // Matched on segment boundaries rather than as a substring: "/files" as a substring also
+    // selects "/files-of-everyone", which would then be attributed by the file rule.
+    if (path.equals("/files") || path.startsWith("/files/")) {
       return isUserFileRequest(req, username);
     }
-    if (path.contains("/landing")) {
-      return query != null && query.contains(username);
+    if (path.equals("/landing") || path.startsWith("/landing/")) {
+      return isUserLandingRequest(query, username);
     }
     return false;
+  }
+
+  /**
+   * A landing request belongs to the user whose name one of its parameters actually is.
+   *
+   * <p>Testing the raw query string for a name as a substring is not that test. The name is chosen
+   * by whoever registers, so a short one is a substring of nearly every query and matches everybody
+   * else's traces, which carry the codes and links these lessons hand out. It also matches when the
+   * name merely appears inside some unrelated value. The uniqueCode parameter is decoded and
+   * compared on its own instead.
+   */
+  private boolean isUserLandingRequest(String query, String username) {
+    if (query == null || username == null || username.isEmpty()) {
+      return false;
+    }
+    // The landing page is reached with uniqueCode=<username reversed>: LandingAssignment hands
+    // out StringUtils.reverse(username) and checks the click against the same value. Comparing
+    // the parameter with the name itself never matches, which would hide the user's own trace
+    // and leave the lesson with nothing to show.
+    String expected = StringUtils.reverse(username);
+    for (String parameter : query.split("&")) {
+      int separator = parameter.indexOf('=');
+      if (separator < 0) {
+        continue;
+      }
+      if (!"uniqueCode".equals(decode(parameter.substring(0, separator)))) {
+        continue;
+      }
+      if (expected.equals(decode(parameter.substring(separator + 1)))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * A malformed escape such as {@code %zz} makes {@link URLDecoder} throw. Anyone may reach
+   * /landing without signing in, so an unguarded call would let a stranger record one bad trace
+   * and take this page down for everybody whose traces sit behind it in the shared queue.
+   */
+  private String decode(String raw) {
+    try {
+      return URLDecoder.decode(raw, StandardCharsets.UTF_8);
+    } catch (IllegalArgumentException e) {
+      return raw;
+    }
   }
 
   private boolean isUserFileRequest(HttpExchange.Request request, String username) {

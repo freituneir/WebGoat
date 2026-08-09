@@ -66,7 +66,10 @@ public class RegistrationController {
   public String registrationOAUTH(Authentication authentication, HttpServletRequest request)
       throws ServletException {
     log.info("register oauth user in database");
-    userService.addUser(authentication.getName(), UUID.randomUUID().toString());
+    // Only create the account the provider just authenticated, never rewrite one that exists.
+    // This runs on a GET, so anything able to make a signed-in browser fetch a url could otherwise
+    // replace that account's password with a value nobody knows and lock its owner out.
+    userService.addUserIfAbsent(authentication.getName(), UUID.randomUUID().toString());
     return "redirect:/welcome.mvc";
   }
 }
