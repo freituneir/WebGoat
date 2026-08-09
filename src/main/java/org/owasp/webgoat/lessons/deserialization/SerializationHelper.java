@@ -8,21 +8,45 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Base64;
+import org.dummy.insecure.framework.VulnerableTaskHolder;
 
 public class SerializationHelper {
 
   private static final char[] hexArray = "0123456789ABCDEF".toCharArray();
 
+  /*
+   * Reading an object back is where a hostile stream gets to name the classes it wants built, and
+   * a gadget's readObject() runs while the graph is still being rebuilt - before any caller can
+   * look at what it received. The filter below decides on the type first: only the task holder,
+   * strings and primitives are allowed through, everything else is refused.
+   */
+  private static final ObjectInputFilter EXPECTED_TYPES_ONLY =
+      info -> {
+        Class<?> type = info.serialClass();
+        if (type == null) {
+          return ObjectInputFilter.Status.UNDECIDED;
+        }
+        while (type.isArray()) {
+          type = type.getComponentType();
+        }
+        boolean allowed =
+            type.isPrimitive()
+                || String.class.equals(type)
+                || VulnerableTaskHolder.class.equals(type);
+        return allowed ? ObjectInputFilter.Status.ALLOWED : ObjectInputFilter.Status.REJECTED;
+      };
+
   public static Object fromString(String s) throws IOException, ClassNotFoundException {
     byte[] data = Base64.getDecoder().decode(s);
-    ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data));
-    Object o = ois.readObject();
-    ois.close();
-    return o;
+    try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data))) {
+      ois.setObjectInputFilter(EXPECTED_TYPES_ONLY);
+      return ois.readObject();
+    }
   }
 
   public static String toString(Serializable o) throws IOException {
