@@ -7,19 +7,8 @@ package org.owasp.webgoat.lessons.sqlinjection.mitigation;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardJavaFileManager;
-import javax.tools.ToolProvider;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -69,64 +58,17 @@ public class SqlInjectionLesson10b implements AssignmentEndpoint {
               && usesPlaceholder
               && usesSetString
               && (usesExecute || usesExecuteUpdate));
-      List<Diagnostic> hasCompiled = this.compileFromString(editor);
-
-      if (hasImportant && hasCompiled.size() < 1) {
+      // The submission used to be wrapped in a class and handed to the JDK compiler at runtime.
+      // Compiling source that arrived with a request lets a caller decide what the server turns
+      // into bytecode, writes .class files of their choosing to disk and, with an annotation
+      // processor on the classpath, runs their code outright. The answer is inspected as text.
+      if (hasImportant) {
         return success(this).feedback("sql-injection.10b.success").build();
-      } else if (hasCompiled.size() > 0) {
-        String errors = "";
-        for (Diagnostic d : hasCompiled) {
-          errors += d.getMessage(null) + "<br>";
-        }
-        return failed(this).feedback("sql-injection.10b.compiler-errors").output(errors).build();
       } else {
         return failed(this).feedback("sql-injection.10b.failed").build();
       }
     } catch (Exception e) {
       return failed(this).output(e.getMessage()).build();
-    }
-  }
-
-  private List<Diagnostic> compileFromString(String s) {
-    JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-    DiagnosticCollector diagnosticsCollector = new DiagnosticCollector();
-    StandardJavaFileManager fileManager =
-        compiler.getStandardFileManager(diagnosticsCollector, null, null);
-    JavaFileObject javaObjectFromString = getJavaFileContentsAsString(s);
-    Iterable fileObjects = Arrays.asList(javaObjectFromString);
-    JavaCompiler.CompilationTask task =
-        compiler.getTask(null, fileManager, diagnosticsCollector, null, null, fileObjects);
-    Boolean result = task.call();
-    List<Diagnostic> diagnostics = diagnosticsCollector.getDiagnostics();
-    return diagnostics;
-  }
-
-  private SimpleJavaFileObject getJavaFileContentsAsString(String s) {
-    StringBuilder javaFileContents =
-        new StringBuilder(
-            "import java.sql.*; public class TestClass { static String DBUSER; static String DBPW;"
-                + " static String DBURL; public static void main(String[] args) {"
-                + s
-                + "}}");
-    JavaObjectFromString javaFileObject = null;
-    try {
-      javaFileObject = new JavaObjectFromString("TestClass.java", javaFileContents.toString());
-    } catch (Exception exception) {
-      exception.printStackTrace();
-    }
-    return javaFileObject;
-  }
-
-  class JavaObjectFromString extends SimpleJavaFileObject {
-    private String contents = null;
-
-    public JavaObjectFromString(String className, String contents) throws Exception {
-      super(new URI(className), Kind.SOURCE);
-      this.contents = contents;
-    }
-
-    public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
-      return contents;
     }
   }
 
