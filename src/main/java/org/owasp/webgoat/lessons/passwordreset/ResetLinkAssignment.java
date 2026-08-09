@@ -85,9 +85,14 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   }
 
   @GetMapping("/PasswordReset/reset/reset-password/{link}")
-  public ModelAndView resetPassword(@PathVariable(value = "link") String link, Model model) {
+  public ModelAndView resetPassword(
+      @PathVariable(value = "link") String link, Model model, @CurrentUsername String username) {
     ModelAndView modelAndView = new ModelAndView();
-    if (ResetLinkAssignment.resetLinks.contains(link)) {
+    // Membership of the link list says only that this token exists somewhere in the application,
+    // and the list is shared by every account. Handing back the change-password form on that basis
+    // alone means anyone holding somebody else's link is already past the gate, whatever the form
+    // it posts to checks afterwards. The same ownership rule is applied here, on the way in.
+    if (isOwnedBy(link, username)) {
       PasswordChangeForm form = new PasswordChangeForm();
       form.setResetLink(link);
       model.addAttribute("form", form);
@@ -95,6 +100,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       modelAndView.setViewName(
           VIEW_FORMATTER.formatted("password_reset")); // Display html page for changing password
     } else {
+      // one answer for "no such link" and for "not yours", so this does not confirm either
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
     }
     return modelAndView;
