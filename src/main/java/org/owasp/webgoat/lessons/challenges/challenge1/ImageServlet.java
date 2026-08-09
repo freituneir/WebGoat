@@ -8,7 +8,7 @@ import static org.springframework.web.bind.annotation.RequestMethod.GET;
 import static org.springframework.web.bind.annotation.RequestMethod.POST;
 
 import java.io.IOException;
-import java.util.Random;
+import java.security.SecureRandom;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ImageServlet {
 
-  public static final int PINCODE = new Random().nextInt(10000);
+  // The admin password is derived from this value, so it never gets written into a response.
+  // It used to be painted into the bytes of the image that this endpoint hands out.
+  public static final int PINCODE = new SecureRandom().nextInt(Integer.MAX_VALUE);
 
   @RequestMapping(
       method = {GET, POST},
@@ -30,13 +32,6 @@ public class ImageServlet {
         new ClassPathResource("lessons/challenges/images/webgoat2.png")
             .getInputStream()
             .readAllBytes();
-
-    String pincode = String.format("%04d", PINCODE);
-
-    in[81216] = (byte) pincode.charAt(0);
-    in[81217] = (byte) pincode.charAt(1);
-    in[81218] = (byte) pincode.charAt(2);
-    in[81219] = (byte) pincode.charAt(3);
 
     return in;
   }
